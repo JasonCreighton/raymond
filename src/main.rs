@@ -14,6 +14,7 @@ struct Vec3f {
 struct Sphere {
 	center: Vec3f,
 	radius: f32,
+	color: LinearRGB,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -25,7 +26,7 @@ struct LinearRGB {
 
 #[derive(Debug, Copy, Clone)]
 struct LightSource {
-	position: Vec3f,
+	dir_to_light: Vec3f,
 	intensity: f32,
 }
 
@@ -94,6 +95,16 @@ impl LinearRGB {
 			LinearRGB::gamma_correct_component(self.blue),
 		)
 	}
+	
+	// TODO: Very similar to Vec3f functionality, and one could imagine use for other
+	// methods from Vec3f as well, maybe there is a way to factor out the common methods.
+	fn scale(&self, factor: f32) -> LinearRGB {
+		LinearRGB {
+			red: self.red * factor,
+			green: self.green * factor,
+			blue: self.blue * factor,
+		}
+	}
 }
 
 impl Vec3f {
@@ -160,13 +171,14 @@ impl Scene {
 			Some((t1, t2)) => {
 				let intersection_pos = ray_origin.add(&ray_direction.scale(t1.min(t2)));
 				let surface_normal = intersection_pos.sub(&s1.center);
-				let dir_to_light = light.position.sub(&intersection_pos);
-				let intensity = dir_to_light.normalize().dot(&surface_normal.normalize()).max(0.0);
-				let obj_color = LinearRGB { red: 0.0, green: 0.0, blue: 0.5 };
+				let ambient_lighting_intensity = 1.0;
+				let lambert_light_intensity = light.dir_to_light.normalize().dot(&surface_normal.normalize()).max(0.0) * light.intensity;
 				
-				LinearRGB { red: 0.0, green: 0.0, blue: 0.1 + (intensity/2.0) }
+				let light_intensity = ambient_lighting_intensity + lambert_light_intensity;
+				
+				s1.color.scale(light_intensity)
 			}
-			None => LinearRGB { red: 0.0, green: 0.2, blue: 0.0 },
+			None => self.background,
 		}
 	}
 }
@@ -187,19 +199,20 @@ fn solve_quadratic(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
 
 fn build_scene() -> Scene {
 	let mut scene = Scene {
-		background: LinearRGB { red: 0.0, green: 1.0, blue: 1.0 },
+		background: LinearRGB { red: 0.0, green: 0.2, blue: 0.0 },
 		light_sources: Vec::new(),
 		spheres: Vec::new(),
 	};
 	
 	scene.light_sources.push(LightSource {
-		position: Vec3f { x: -10.0, y: 0.0, z: 10.0 },
-		intensity: 1.0,
+		dir_to_light: Vec3f { x: -10.0, y: 0.0, z: 10.0 },
+		intensity: 5.0,
 	});
 	
 	scene.spheres.push(Sphere {
 		center: Vec3f { x: 0.0, y: 0.0, z: 0.0 },
 		radius: 1.0,
+		color: LinearRGB { red: 0.0, green: 0.0, blue: 0.1 },
 	});
 	
 	scene
