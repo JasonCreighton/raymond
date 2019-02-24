@@ -159,9 +159,18 @@ impl Sphere {
 		let b = 2.0 * ray_direction.dot(&origin_minus_center);
 		let c = origin_minus_center.dot(&origin_minus_center) - (self.radius * self.radius);
 		
-		// FIXME: Just taking the min of the two distances doesn't work in the case where
-		// you have negative values (ie, the sphere is behind the camera)
-		solve_quadratic(a, b, c).map(|(t1, t2)| t1.min(t2))			
+		// TODO: This is a little ugly. We want to max of t1 and t2, but only considering
+		// those that are positive, since we don't want to detect objects behind us. Seems
+		// like there should be a clearer way to do this.
+		match solve_quadratic(a, b, c) {
+			Some((t1, t2)) => match (t1 > 0.0, t2 > 0.0) {
+				(false, false) => None,
+				(false, true)  => Some(t2),
+				(true,  false) => Some(t1),
+				(true,  true)  => Some(t1.min(t2)),
+			},
+			None => None,
+		}
 	}
 }
 
@@ -175,17 +184,36 @@ impl Scene {
 			// Select (sphere, distance) 2-tuple with the minimum distance
 			.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
 	}
+	
+	fn light_on_surface(&self, surface_position: &Vec3f, surface_normal: &Vec3f) -> f32 {
+		let ambient_light_intensity = 1.0;
+		
+		// If we try to trace from the exact position on the surface, sometimes we will
+		// detect the object that we are on due to floating point rounding issues.
+		// Therefore, we add a slight bias in the direction of the surface normal to
+		// avoid this.
+		let float_bias = 0.001;
+		let trace_pos = surface_position.add(&surface_normal.scale(float_bias));
+		
+		let lambert_light_intensity: f32 = self.light_sources.iter().map(|light_source|
+			match self.trace_to_nearest_object(&trace_pos, &light_source.dir_to_light) {
+				Some(_) => 0.0, // something is in the way
+				None => {
+					// There is a path to the light, apply it
+					light_source.dir_to_light.normalize().dot(&surface_normal).max(0.0) * light_source.intensity
+				}
+			})
+			.sum();
+		
+		ambient_light_intensity + lambert_light_intensity
+	}
 
 	fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> LinearRGB {
-		let light = &self.light_sources[0]; // FIXME
 		match self.trace_to_nearest_object(&ray_origin, &ray_direction) {
 			Some((sphere, dist)) => {
 				let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
-				let surface_normal = intersection_pos.sub(&sphere.center);
-				let ambient_lighting_intensity = 1.0;
-				let lambert_light_intensity = light.dir_to_light.normalize().dot(&surface_normal.normalize()).max(0.0) * light.intensity;
-				
-				let light_intensity = ambient_lighting_intensity + lambert_light_intensity;
+				let surface_normal = intersection_pos.sub(&sphere.center).normalize();				
+				let light_intensity = self.light_on_surface(&intersection_pos, &surface_normal);
 				
 				sphere.color.scale(light_intensity)
 			}
@@ -216,18 +244,18 @@ fn build_scene() -> Scene {
 	};
 	
 	scene.light_sources.push(LightSource {
-		dir_to_light: Vec3f { x: -10.0, y: 0.0, z: 10.0 },
+		dir_to_light: Vec3f { x: 0.0, y: 0.0, z: 10.0 },
 		intensity: 5.0,
 	});
 	
 	scene.spheres.push(Sphere {
-		center: Vec3f { x: 0.0, y: 0.75, z: 0.0 },
+		center: Vec3f { x: 0.0, y: 0.0, z: 1.5 },
 		radius: 1.0,
 		color: LinearRGB { red: 0.0, green: 0.0, blue: 0.1 },
 	});
 	
 	scene.spheres.push(Sphere {
-		center: Vec3f { x: 0.0, y: 0.0, z: 0.0 },
+		center: Vec3f { x: 0.0, y: 0.5, z: 0.0 },
 		radius: 1.0,
 		color: LinearRGB { red: 0.1, green: 0.0, blue: 0.0 },
 	});
