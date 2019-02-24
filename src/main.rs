@@ -152,31 +152,42 @@ impl Vec3f {
 }
 
 impl Sphere {
-	fn intersects(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(f32, f32)>
+	fn nearest_intersection(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
 	{
 		let origin_minus_center = ray_origin.sub(&self.center);
 		let a = ray_direction.dot(&ray_direction); // Shouldn't this always be 1.0???
 		let b = 2.0 * ray_direction.dot(&origin_minus_center);
 		let c = origin_minus_center.dot(&origin_minus_center) - (self.radius * self.radius);
 		
-		solve_quadratic(a, b, c)
+		// FIXME: Just taking the min of the two distances doesn't work in the case where
+		// you have negative values (ie, the sphere is behind the camera)
+		solve_quadratic(a, b, c).map(|(t1, t2)| t1.min(t2))			
 	}
 }
 
 impl Scene {
+	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&Sphere, f32)>
+	{
+		self.spheres
+			.iter()
+			// Get a list of intersecting spheres with their distances as a 2-tuple
+			.filter_map(|sphere| sphere.nearest_intersection(&ray_origin, &ray_direction).map(|dist| (sphere, dist)))
+			// Select (sphere, distance) 2-tuple with the minimum distance
+			.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
+	}
+
 	fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> LinearRGB {
-		let s1 = &self.spheres[0]; // FIXME
 		let light = &self.light_sources[0]; // FIXME
-		match s1.intersects(&ray_origin, &ray_direction) {
-			Some((t1, t2)) => {
-				let intersection_pos = ray_origin.add(&ray_direction.scale(t1.min(t2)));
-				let surface_normal = intersection_pos.sub(&s1.center);
+		match self.trace_to_nearest_object(&ray_origin, &ray_direction) {
+			Some((sphere, dist)) => {
+				let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
+				let surface_normal = intersection_pos.sub(&sphere.center);
 				let ambient_lighting_intensity = 1.0;
 				let lambert_light_intensity = light.dir_to_light.normalize().dot(&surface_normal.normalize()).max(0.0) * light.intensity;
 				
 				let light_intensity = ambient_lighting_intensity + lambert_light_intensity;
 				
-				s1.color.scale(light_intensity)
+				sphere.color.scale(light_intensity)
 			}
 			None => self.background,
 		}
@@ -210,9 +221,15 @@ fn build_scene() -> Scene {
 	});
 	
 	scene.spheres.push(Sphere {
-		center: Vec3f { x: 0.0, y: 0.0, z: 0.0 },
+		center: Vec3f { x: 0.0, y: 0.75, z: 0.0 },
 		radius: 1.0,
 		color: LinearRGB { red: 0.0, green: 0.0, blue: 0.1 },
+	});
+	
+	scene.spheres.push(Sphere {
+		center: Vec3f { x: 0.0, y: 0.0, z: 0.0 },
+		radius: 1.0,
+		color: LinearRGB { red: 0.1, green: 0.0, blue: 0.0 },
 	});
 	
 	scene
@@ -223,7 +240,7 @@ fn main() {
 	let width = 640;
 	let height = 480;
 	let scene = build_scene();
-	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 0.0 }, Vec3f { x: 1.0, y: 0.0, z: 0.0 });
+	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 10.0 }, Vec3f { x: 1.0, y: 0.0, z: -1.0 });
 	
 	let mut image = ppm::PPMWriter::new("test.ppm", width, height);
 	
