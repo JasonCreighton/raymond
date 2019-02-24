@@ -1,0 +1,10 @@
+[package]
+name = "raymond"
+version = "0.1.0"
+authors = ["Jason Creighton"]
+edition = "2018"
+
+[dependencies]
+
+[profile.release]
+debug = true
