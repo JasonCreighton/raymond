@@ -185,10 +185,12 @@ impl VisObj for Sphere {
 }
 
 impl Scene {
-	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&Box<dyn VisObj>, f32)>
+	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&dyn VisObj, f32)>
 	{
 		self.objects
 			.iter()
+			// Unbox and convert to reference
+			.map(|boxed| &**boxed)
 			// Get a list of intersecting spheres with their distances as a 2-tuple
 			.filter_map(|vobj| vobj.intersection_with_ray(&ray_origin, &ray_direction).map(|dist| (vobj, dist)))
 			// Select (vobj, distance) 2-tuple with the minimum distance
