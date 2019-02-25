@@ -30,11 +30,10 @@ struct LightSource {
 	intensity: f32,
 }
 
-#[derive(Debug)]
 struct Scene {
 	background: LinearRGB,
 	light_sources: Vec<LightSource>,
-	spheres: Vec<Sphere>,	
+	objects: Vec<Box<dyn VisObj>>,
 }
 
 #[derive(Debug)]
@@ -43,6 +42,11 @@ struct Camera {
 	upper_left: Vec3f,
 	delta_x: Vec3f,
 	delta_y: Vec3f,
+}
+
+trait VisObj {
+	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>;
+	fn surface_properties(&self, point_on_surface: &Vec3f) -> (Vec3f, LinearRGB);
 }
 
 impl Camera {
@@ -151,8 +155,8 @@ impl Vec3f {
 	}
 }
 
-impl Sphere {
-	fn nearest_intersection(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
+impl VisObj for Sphere {
+	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
 	{
 		let origin_minus_center = ray_origin.sub(&self.center);
 		let a = ray_direction.dot(&ray_direction); // Shouldn't this always be 1.0???
@@ -172,16 +176,22 @@ impl Sphere {
 			None => None,
 		}
 	}
+	
+	fn surface_properties(&self, point_on_surface: &Vec3f) -> (Vec3f, LinearRGB) {
+		let surface_normal = point_on_surface.sub(&self.center).normalize();
+		
+		(surface_normal, self.color)
+	}
 }
 
 impl Scene {
-	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&Sphere, f32)>
+	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&Box<dyn VisObj>, f32)>
 	{
-		self.spheres
+		self.objects
 			.iter()
 			// Get a list of intersecting spheres with their distances as a 2-tuple
-			.filter_map(|sphere| sphere.nearest_intersection(&ray_origin, &ray_direction).map(|dist| (sphere, dist)))
-			// Select (sphere, distance) 2-tuple with the minimum distance
+			.filter_map(|vobj| vobj.intersection_with_ray(&ray_origin, &ray_direction).map(|dist| (vobj, dist)))
+			// Select (vobj, distance) 2-tuple with the minimum distance
 			.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
 	}
 	
@@ -210,12 +220,12 @@ impl Scene {
 
 	fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> LinearRGB {
 		match self.trace_to_nearest_object(&ray_origin, &ray_direction) {
-			Some((sphere, dist)) => {
+			Some((vobj, dist)) => {
 				let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
-				let surface_normal = intersection_pos.sub(&sphere.center).normalize();				
+				let (surface_normal, color) = vobj.surface_properties(&intersection_pos);
 				let light_intensity = self.light_on_surface(&intersection_pos, &surface_normal);
 				
-				sphere.color.scale(light_intensity)
+				color.scale(light_intensity)
 			}
 			None => self.background,
 		}
@@ -240,7 +250,7 @@ fn build_scene() -> Scene {
 	let mut scene = Scene {
 		background: LinearRGB { red: 0.0, green: 0.2, blue: 0.0 },
 		light_sources: Vec::new(),
-		spheres: Vec::new(),
+		objects: Vec::new(),
 	};
 	
 	scene.light_sources.push(LightSource {
@@ -248,17 +258,17 @@ fn build_scene() -> Scene {
 		intensity: 5.0,
 	});
 	
-	scene.spheres.push(Sphere {
+	scene.objects.push(Box::new(Sphere {
 		center: Vec3f { x: 0.0, y: 0.0, z: 1.5 },
 		radius: 1.0,
 		color: LinearRGB { red: 0.0, green: 0.0, blue: 0.1 },
-	});
+	}));
 	
-	scene.spheres.push(Sphere {
+	scene.objects.push(Box::new(Sphere {
 		center: Vec3f { x: 0.0, y: 0.5, z: 0.0 },
 		radius: 1.0,
 		color: LinearRGB { red: 0.1, green: 0.0, blue: 0.0 },
-	});
+	}));
 	
 	scene
 }
