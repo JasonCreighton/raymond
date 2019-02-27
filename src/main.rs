@@ -18,6 +18,14 @@ struct Sphere {
 }
 
 #[derive(Debug, Copy, Clone)]
+struct Plane {
+	position: Vec3f,
+	u_basis: Vec3f,
+	v_basis: Vec3f,
+	normal: Vec3f,
+}
+
+#[derive(Debug, Copy, Clone)]
 struct LinearRGB {
 	red: f32,
 	green: f32,
@@ -155,6 +163,59 @@ impl Vec3f {
 	}
 }
 
+impl Plane {
+	fn new(position: &Vec3f, u_basis: &Vec3f, v_basis: &Vec3f) -> Plane {
+		let normal = u_basis.cross(v_basis);
+		
+		Plane {
+			position: *position,
+			u_basis: *u_basis,
+			v_basis: *v_basis,
+			normal: normal,
+		}
+	}
+}
+
+impl VisObj for Plane {
+	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
+	{
+		let denom = ray_direction.dot(&self.normal);
+		
+		if denom.abs() < 0.001 {
+			// Basically zero, no intersection
+			None
+		} else {
+			let numer = (self.position.sub(&ray_origin)).dot(&self.normal);
+			let d = numer / denom;
+			
+			if d > 0.0 {
+				Some(d)
+			} else {
+				None
+			}
+		}		
+	}
+	
+	fn surface_properties(&self, point_on_surface: &Vec3f) -> (Vec3f, LinearRGB) {
+		let vec_within_plane = point_on_surface.sub(&self.position);
+		let u = vec_within_plane.dot(&self.u_basis);
+		let v = vec_within_plane.dot(&self.v_basis);
+		
+		let u_int = u.floor().abs() as i32;
+		let v_int = v.floor().abs() as i32;
+		let square_number = u_int + v_int;
+		
+		let color = match square_number % 2 {
+			// FIXME: Shouldn't hardcode colors
+			0 => LinearRGB { red: 0.5, green: 0.5, blue: 0.5 },
+			1 => LinearRGB { red: 0.5, green: 0.0, blue: 0.0 },
+			_ => unreachable!(),
+		};
+		
+		(self.normal, color)
+	}
+}
+
 impl VisObj for Sphere {
 	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
 	{
@@ -250,13 +311,13 @@ fn solve_quadratic(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
 
 fn build_scene() -> Scene {
 	let mut scene = Scene {
-		background: LinearRGB { red: 0.0, green: 0.2, blue: 0.0 },
+		background: LinearRGB { red: 0.0, green: 0.0, blue: 0.0 },
 		light_sources: Vec::new(),
 		objects: Vec::new(),
 	};
 	
 	scene.light_sources.push(LightSource {
-		dir_to_light: Vec3f { x: 0.0, y: 0.0, z: 10.0 },
+		dir_to_light: Vec3f { x: 0.0, y: 3.0, z: 10.0 },
 		intensity: 5.0,
 	});
 	
@@ -272,6 +333,12 @@ fn build_scene() -> Scene {
 		color: LinearRGB { red: 0.1, green: 0.0, blue: 0.0 },
 	}));
 	
+	scene.objects.push(Box::new(Plane::new(
+		&Vec3f { x: 0.0, y: 0.0, z: 0.0 },
+		&Vec3f { x: 1.0, y: 0.0, z: 0.0 },
+		&Vec3f { x: 0.0, y: 1.0, z: 0.0 },
+	)));
+	
 	scene
 }
 
@@ -280,7 +347,7 @@ fn main() {
 	let width = 640;
 	let height = 480;
 	let scene = build_scene();
-	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 10.0 }, Vec3f { x: 1.0, y: 0.0, z: -1.0 });
+	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 2.0 }, Vec3f { x: 10.0, y: 0.0, z: -1.0 });
 	
 	let mut image = ppm::PPMWriter::new("test.ppm", width, height);
 	
