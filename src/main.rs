@@ -1,35 +1,11 @@
-//use std::vec;
-//use std::dbg;
-
 mod ppm;
+mod math;
+mod surface;
+mod texture;
 
-#[derive(Debug, Copy, Clone)]
-struct Vec3f {
-	x: f32,
-	y: f32,
-	z: f32,
-}
-
-#[derive(Debug, Copy, Clone)]
-struct Sphere {
-	center: Vec3f,
-	radius: f32,
-}
-
-#[derive(Debug, Copy, Clone)]
-struct Plane {
-	position: Vec3f,
-	u_basis: Vec3f,
-	v_basis: Vec3f,
-	normal: Vec3f,
-}
-
-#[derive(Debug, Copy, Clone)]
-struct LinearRGB {
-	red: f32,
-	green: f32,
-	blue: f32,
-}
+use math::Vec3f;
+use surface::*;
+use texture::*;
 
 #[derive(Debug, Copy, Clone)]
 struct LightSource {
@@ -54,28 +30,6 @@ struct Camera {
 	upper_left: Vec3f,
 	delta_x: Vec3f,
 	delta_y: Vec3f,
-}
-
-#[derive(Debug, Copy, Clone)]
-struct SurfaceProperties {
-	normal: Vec3f,
-	u: f32,
-	v: f32,
-}
-
-struct Checkerboard {
-	square_size: f32,
-	texture1: Box<dyn Texture>,
-	texture2: Box<dyn Texture>,
-}
-
-trait Texture {
-	fn color(&self, u: f32, v: f32) -> LinearRGB;
-}
-
-trait Surface {
-	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>;
-	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties;
 }
 
 impl Camera {
@@ -110,185 +64,6 @@ impl Camera {
 		self.upper_left
 			.add(&self.delta_x.scale(x as f32))
 			.add(&self.delta_y.scale(y as f32))
-	}
-}
-
-impl LinearRGB {
-	fn gamma_correct_component(linear_value: f32) -> u8 {
-		// Clamp to [0.0, 1.0] and apply gamma correction transfer function
-		// (I am not a color space expert and I don't think this is quite correct
-		// but it is close enough.)
-		(linear_value.max(0.0).min(1.0).powf(1.0/2.2) * 255.0) as u8
-	}
-
-	fn gamma_correct(&self) -> (u8, u8, u8) {
-		(
-			LinearRGB::gamma_correct_component(self.red),
-			LinearRGB::gamma_correct_component(self.green),
-			LinearRGB::gamma_correct_component(self.blue),
-		)
-	}
-	
-	// TODO: Very similar to Vec3f functionality, and one could imagine use for other
-	// methods from Vec3f as well, maybe there is a way to factor out the common methods.
-	fn scale(&self, factor: f32) -> LinearRGB {
-		LinearRGB {
-			red: self.red * factor,
-			green: self.green * factor,
-			blue: self.blue * factor,
-		}
-	}
-}
-
-impl Texture for LinearRGB {
-	fn color(&self, _u: f32, _v: f32) -> LinearRGB {
-		*self
-	}
-}
-
-impl Vec3f {
-	const UP: Vec3f = Vec3f { x: 0.0, y: 0.0, z: 1.0 };
-
-	fn add(&self, other: &Vec3f) -> Vec3f {
-		Vec3f {
-			x: self.x + other.x,
-			y: self.y + other.y,
-			z: self.z + other.z,
-		}
-	}
-		
-	fn sub(&self, other: &Vec3f) -> Vec3f {
-		Vec3f {
-			x: self.x - other.x,
-			y: self.y - other.y,
-			z: self.z - other.z,
-		}
-	}
-	
-	fn scale(&self, factor: f32) -> Vec3f {
-		Vec3f {
-			x: self.x * factor,
-			y: self.y * factor,
-			z: self.z * factor,
-		}
-	}
-	
-	fn normalize(&self) -> Vec3f {
-		self.scale(1.0 / self.dot(self).sqrt())
-	}
-		
-	fn dot(&self, other: &Vec3f) -> f32 {
-		(self.x * other.x) + (self.y * other.y) + (self.z * other.z)
-	}
-	
-	fn cross(&self, other: &Vec3f) -> Vec3f {
-		Vec3f {
-			x: self.y*other.z - self.z*other.y,
-			y: self.z*other.x - self.x*other.z,
-			z: self.x*other.y - self.y*other.x,
-		}
-	}
-}
-
-impl Plane {
-	fn new(position: &Vec3f, u_basis: &Vec3f, v_basis: &Vec3f) -> Plane {
-		let normal = u_basis.cross(v_basis);
-		
-		Plane {
-			position: *position,
-			u_basis: *u_basis,
-			v_basis: *v_basis,
-			normal: normal,
-		}
-	}
-}
-
-impl Surface for Plane {
-	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
-	{
-		let denom = ray_direction.dot(&self.normal);
-		
-		if denom.abs() < 0.001 {
-			// Basically zero, no intersection
-			None
-		} else {
-			let numer = (self.position.sub(&ray_origin)).dot(&self.normal);
-			let d = numer / denom;
-			
-			if d > 0.0 {
-				Some(d)
-			} else {
-				None
-			}
-		}		
-	}
-	
-	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
-		let vec_within_plane = point_on_surface.sub(&self.position);
-		let u = vec_within_plane.dot(&self.u_basis);
-		let v = vec_within_plane.dot(&self.v_basis);
-		
-		SurfaceProperties {
-			normal: self.normal,
-			u: u,
-			v: v,
-		}
-
-	}
-}
-
-impl Surface for Sphere {
-	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
-	{
-		let origin_minus_center = ray_origin.sub(&self.center);
-		let a = ray_direction.dot(&ray_direction); // Shouldn't this always be 1.0???
-		let b = 2.0 * ray_direction.dot(&origin_minus_center);
-		let c = origin_minus_center.dot(&origin_minus_center) - (self.radius * self.radius);
-		
-		// TODO: This is a little ugly. We want to max of t1 and t2, but only considering
-		// those that are positive, since we don't want to detect objects behind us. Seems
-		// like there should be a clearer way to do this.
-		match solve_quadratic(a, b, c) {
-			Some((t1, t2)) => match (t1 > 0.0, t2 > 0.0) {
-				(false, false) => None,
-				(false, true)  => Some(t2),
-				(true,  false) => Some(t1),
-				(true,  true)  => Some(t1.min(t2)),
-			},
-			None => None,
-		}
-	}
-	
-	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
-		let d = point_on_surface.sub(&self.center).normalize();
-		let surface_normal = point_on_surface.sub(&self.center).normalize();
-		//let u = 0.5 + d.z.atan2(d.x) / (2.0 * std::f32::consts::PI);
-		//let v = 0.5 - d.y.asin() / std::f32::consts::PI;
-		
-		let u = 0.5 + d.y.atan2(d.x) / (2.0 * std::f32::consts::PI);
-		let v = 0.5 - d.z.asin() / std::f32::consts::PI;
-		
-		SurfaceProperties {
-			normal: surface_normal,
-			u: u,
-			v: v,
-		}
-	}
-}
-
-impl Texture for Checkerboard {
-	fn color(&self, u: f32, v: f32) -> LinearRGB {
-		let scaled_u = u / self.square_size;
-		let scaled_v = v / self.square_size;
-		let square_number = (scaled_u.floor() + scaled_v.floor()) as i32;
-		let square_u = scaled_u - u.floor();
-		let square_v = scaled_v - v.floor();
-		
-		match (square_number + 1000000) % 2 {
-			0 => self.texture1.color(square_u, square_v),
-			1 => self.texture2.color(square_u, square_v),
-			_ => unreachable!(),
-		}
 	}
 }
 
@@ -341,20 +116,6 @@ impl Scene {
 	}
 }
 
-fn solve_quadratic(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
-	let discriminant = (b*b) - 4.0*a*c;
-	// The single solution case tends to be degenerate, we only find the two solution case
-	if discriminant > 0.0 {
-		let scale = 1.0 / (2.0 * a);
-		let x = -b * scale;
-		let delta = discriminant.sqrt() * scale;
-		
-		Some((x + delta, x - delta))
-	} else {
-		None
-	}
-}
-
 fn build_scene() -> Scene {
 	let mut scene = Scene {
 		background: LinearRGB { red: 0.0, green: 0.0, blue: 0.0 },
@@ -368,22 +129,16 @@ fn build_scene() -> Scene {
 	});
 	
 	scene.objects.push(VisObj {
-		surface: Box::new(Sphere {
-			center: Vec3f { x: 0.0, y: 0.0, z: 1.5 },
-			radius: 1.0,
-		}),
-		texture: Box::new(Checkerboard {
-			square_size: 0.1,
-			texture1: Box::new(LinearRGB { red: 0.0, green: 0.0, blue: 0.5 }),
-			texture2: Box::new(LinearRGB { red: 0.0, green: 0.5, blue: 0.0 }),
-		})
+		surface: Box::new(Sphere::new(&Vec3f { x: 0.0, y: 0.0, z: 1.5 }, 1.0)),
+		texture: Box::new(Checkerboard::new(
+			Box::new(LinearRGB { red: 0.0, green: 0.0, blue: 0.5 }),
+			Box::new(LinearRGB { red: 0.0, green: 0.5, blue: 0.0 }),
+			0.1,
+		)),
 	});
 	
 	scene.objects.push(VisObj {
-		surface: Box::new(Sphere {
-			center: Vec3f { x: 0.0, y: 0.5, z: 0.0 },
-			radius: 1.0,
-		}),
+		surface: Box::new(Sphere::new(&Vec3f { x: 0.0, y: 0.5, z: 0.0 }, 1.0)),
 		texture: Box::new(LinearRGB { red: 0.1, green: 0.0, blue: 0.0 }),
 	});
 	
@@ -393,16 +148,15 @@ fn build_scene() -> Scene {
 			&Vec3f { x: 1.0, y: 0.0, z: 0.0 },
 			&Vec3f { x: 0.0, y: 1.0, z: 0.0 },
 		)),
-		texture: Box::new(Checkerboard {
-			square_size: 0.5,
-			texture1: Box::new(LinearRGB { red: 0.5, green: 0.5, blue: 0.5 }),
-			texture2: Box::new(LinearRGB { red: 0.5, green: 0.0, blue: 0.0 }),
-		}),
+		texture: Box::new(Checkerboard::new(
+			Box::new(LinearRGB { red: 0.5, green: 0.5, blue: 0.5 }),
+			Box::new(LinearRGB { red: 0.5, green: 0.0, blue: 0.0 }),
+			0.5,
+		)),			
 	});
 	
 	scene
 }
-
 
 fn main() {
 	let width = 640;
