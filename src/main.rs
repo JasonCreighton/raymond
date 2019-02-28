@@ -14,7 +14,6 @@ struct Vec3f {
 struct Sphere {
 	center: Vec3f,
 	radius: f32,
-	color: LinearRGB,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -38,10 +37,15 @@ struct LightSource {
 	intensity: f32,
 }
 
+struct VisObj {
+	surface: Box<dyn Surface>,
+	texture: Box<dyn Texture>,
+}
+
 struct Scene {
 	background: LinearRGB,
 	light_sources: Vec<LightSource>,
-	objects: Vec<Box<dyn VisObj>>,
+	objects: Vec<VisObj>,
 }
 
 #[derive(Debug)]
@@ -52,9 +56,26 @@ struct Camera {
 	delta_y: Vec3f,
 }
 
-trait VisObj {
+#[derive(Debug, Copy, Clone)]
+struct SurfaceProperties {
+	normal: Vec3f,
+	u: f32,
+	v: f32,
+}
+
+struct Checkerboard {
+	square_size: f32,
+	texture1: Box<dyn Texture>,
+	texture2: Box<dyn Texture>,
+}
+
+trait Texture {
+	fn color(&self, u: f32, v: f32) -> LinearRGB;
+}
+
+trait Surface {
 	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>;
-	fn surface_properties(&self, point_on_surface: &Vec3f) -> (Vec3f, LinearRGB);
+	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties;
 }
 
 impl Camera {
@@ -119,6 +140,12 @@ impl LinearRGB {
 	}
 }
 
+impl Texture for LinearRGB {
+	fn color(&self, _u: f32, _v: f32) -> LinearRGB {
+		*self
+	}
+}
+
 impl Vec3f {
 	const UP: Vec3f = Vec3f { x: 0.0, y: 0.0, z: 1.0 };
 
@@ -176,7 +203,7 @@ impl Plane {
 	}
 }
 
-impl VisObj for Plane {
+impl Surface for Plane {
 	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
 	{
 		let denom = ray_direction.dot(&self.normal);
@@ -196,27 +223,21 @@ impl VisObj for Plane {
 		}		
 	}
 	
-	fn surface_properties(&self, point_on_surface: &Vec3f) -> (Vec3f, LinearRGB) {
+	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
 		let vec_within_plane = point_on_surface.sub(&self.position);
 		let u = vec_within_plane.dot(&self.u_basis);
 		let v = vec_within_plane.dot(&self.v_basis);
 		
-		let u_int = u.floor().abs() as i32;
-		let v_int = v.floor().abs() as i32;
-		let square_number = u_int + v_int;
-		
-		let color = match square_number % 2 {
-			// FIXME: Shouldn't hardcode colors
-			0 => LinearRGB { red: 0.5, green: 0.5, blue: 0.5 },
-			1 => LinearRGB { red: 0.5, green: 0.0, blue: 0.0 },
-			_ => unreachable!(),
-		};
-		
-		(self.normal, color)
+		SurfaceProperties {
+			normal: self.normal,
+			u: u,
+			v: v,
+		}
+
 	}
 }
 
-impl VisObj for Sphere {
+impl Surface for Sphere {
 	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>
 	{
 		let origin_minus_center = ray_origin.sub(&self.center);
@@ -238,22 +259,46 @@ impl VisObj for Sphere {
 		}
 	}
 	
-	fn surface_properties(&self, point_on_surface: &Vec3f) -> (Vec3f, LinearRGB) {
+	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
+		let d = point_on_surface.sub(&self.center).normalize();
 		let surface_normal = point_on_surface.sub(&self.center).normalize();
+		//let u = 0.5 + d.z.atan2(d.x) / (2.0 * std::f32::consts::PI);
+		//let v = 0.5 - d.y.asin() / std::f32::consts::PI;
 		
-		(surface_normal, self.color)
+		let u = 0.5 + d.y.atan2(d.x) / (2.0 * std::f32::consts::PI);
+		let v = 0.5 - d.z.asin() / std::f32::consts::PI;
+		
+		SurfaceProperties {
+			normal: surface_normal,
+			u: u,
+			v: v,
+		}
+	}
+}
+
+impl Texture for Checkerboard {
+	fn color(&self, u: f32, v: f32) -> LinearRGB {
+		let scaled_u = u / self.square_size;
+		let scaled_v = v / self.square_size;
+		let square_number = (scaled_u.floor() + scaled_v.floor()) as i32;
+		let square_u = scaled_u - u.floor();
+		let square_v = scaled_v - v.floor();
+		
+		match (square_number + 1000000) % 2 {
+			0 => self.texture1.color(square_u, square_v),
+			1 => self.texture2.color(square_u, square_v),
+			_ => unreachable!(),
+		}
 	}
 }
 
 impl Scene {
-	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&dyn VisObj, f32)>
+	fn trace_to_nearest_object(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<(&VisObj, f32)>
 	{
 		self.objects
 			.iter()
-			// Unbox and convert to reference
-			.map(|boxed| &**boxed)
 			// Get a list of intersecting spheres with their distances as a 2-tuple
-			.filter_map(|vobj| vobj.intersection_with_ray(&ray_origin, &ray_direction).map(|dist| (vobj, dist)))
+			.filter_map(|vobj| vobj.surface.intersection_with_ray(&ray_origin, &ray_direction).map(|dist| (vobj, dist)))
 			// Select (vobj, distance) 2-tuple with the minimum distance
 			.min_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap())
 	}
@@ -285,8 +330,9 @@ impl Scene {
 		match self.trace_to_nearest_object(&ray_origin, &ray_direction) {
 			Some((vobj, dist)) => {
 				let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
-				let (surface_normal, color) = vobj.surface_properties(&intersection_pos);
-				let light_intensity = self.light_on_surface(&intersection_pos, &surface_normal);
+				let surf_prop = vobj.surface.at_point(&intersection_pos);
+				let light_intensity = self.light_on_surface(&intersection_pos, &surf_prop.normal);
+				let color = vobj.texture.color(surf_prop.u, surf_prop.v);
 				
 				color.scale(light_intensity)
 			}
@@ -317,27 +363,42 @@ fn build_scene() -> Scene {
 	};
 	
 	scene.light_sources.push(LightSource {
-		dir_to_light: Vec3f { x: 0.0, y: 3.0, z: 10.0 },
+		dir_to_light: Vec3f { x: 0.0, y: 10.0, z: 10.0 },
 		intensity: 5.0,
 	});
 	
-	scene.objects.push(Box::new(Sphere {
-		center: Vec3f { x: 0.0, y: 0.0, z: 1.5 },
-		radius: 1.0,
-		color: LinearRGB { red: 0.0, green: 0.0, blue: 0.1 },
-	}));
+	scene.objects.push(VisObj {
+		surface: Box::new(Sphere {
+			center: Vec3f { x: 0.0, y: 0.0, z: 1.5 },
+			radius: 1.0,
+		}),
+		texture: Box::new(Checkerboard {
+			square_size: 0.1,
+			texture1: Box::new(LinearRGB { red: 0.0, green: 0.0, blue: 0.5 }),
+			texture2: Box::new(LinearRGB { red: 0.0, green: 0.5, blue: 0.0 }),
+		})
+	});
 	
-	scene.objects.push(Box::new(Sphere {
-		center: Vec3f { x: 0.0, y: 0.5, z: 0.0 },
-		radius: 1.0,
-		color: LinearRGB { red: 0.1, green: 0.0, blue: 0.0 },
-	}));
+	scene.objects.push(VisObj {
+		surface: Box::new(Sphere {
+			center: Vec3f { x: 0.0, y: 0.5, z: 0.0 },
+			radius: 1.0,
+		}),
+		texture: Box::new(LinearRGB { red: 0.1, green: 0.0, blue: 0.0 }),
+	});
 	
-	scene.objects.push(Box::new(Plane::new(
-		&Vec3f { x: 0.0, y: 0.0, z: 0.0 },
-		&Vec3f { x: 1.0, y: 0.0, z: 0.0 },
-		&Vec3f { x: 0.0, y: 1.0, z: 0.0 },
-	)));
+	scene.objects.push(VisObj {
+		surface: Box::new(Plane::new(
+			&Vec3f { x: 0.0, y: 0.0, z: 0.0 },
+			&Vec3f { x: 1.0, y: 0.0, z: 0.0 },
+			&Vec3f { x: 0.0, y: 1.0, z: 0.0 },
+		)),
+		texture: Box::new(Checkerboard {
+			square_size: 0.5,
+			texture1: Box::new(LinearRGB { red: 0.5, green: 0.5, blue: 0.5 }),
+			texture2: Box::new(LinearRGB { red: 0.5, green: 0.0, blue: 0.0 }),
+		}),
+	});
 	
 	scene
 }
