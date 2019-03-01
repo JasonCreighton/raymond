@@ -40,6 +40,13 @@ impl LinearRGB {
 			blue: self.blue * factor,
 		}
 	}
+	pub fn add(&self, other: &LinearRGB) -> LinearRGB {
+		LinearRGB {
+			red: self.red + other.red,
+			green: self.green + other.green,
+			blue: self.blue + other.blue,
+		}
+	}
 }
 
 impl Texture for LinearRGB {

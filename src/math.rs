@@ -62,3 +62,7 @@ pub fn solve_quadratic(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
 		None
 	}
 }
+
+pub fn angle_of_reflection(incident: &Vec3f, normal: &Vec3f) -> Vec3f {
+	incident.sub(&normal.scale(2.0 * incident.dot(normal)))
+}

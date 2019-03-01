@@ -4,8 +4,15 @@ mod surface;
 mod texture;
 
 use math::Vec3f;
+use math::angle_of_reflection;
 use surface::*;
 use texture::*;
+
+// If we try to trace from the exact position on a surface, sometimes we will
+// detect the object that we are on due to floating point rounding issues.
+// Therefore, we add a slight bias in the direction of the surface normal to
+// avoid this.
+const FLOAT_BIAS: f32 = 0.0001;
 
 #[derive(Debug, Copy, Clone)]
 struct LightSource {
@@ -16,6 +23,7 @@ struct LightSource {
 struct VisObj {
 	surface: Box<dyn Surface>,
 	texture: Box<dyn Texture>,
+	reflectivity: f32,
 }
 
 struct Scene {
@@ -80,13 +88,7 @@ impl Scene {
 	
 	fn light_on_surface(&self, surface_position: &Vec3f, surface_normal: &Vec3f) -> f32 {
 		let ambient_light_intensity = 1.0;
-		
-		// If we try to trace from the exact position on the surface, sometimes we will
-		// detect the object that we are on due to floating point rounding issues.
-		// Therefore, we add a slight bias in the direction of the surface normal to
-		// avoid this.
-		let float_bias = 0.001;
-		let trace_pos = surface_position.add(&surface_normal.scale(float_bias));
+		let trace_pos = surface_position.add(&surface_normal.scale(FLOAT_BIAS));
 		
 		let lambert_light_intensity: f32 = self.light_sources.iter().map(|light_source|
 			match self.trace_to_nearest_object(&trace_pos, &light_source.dir_to_light) {
@@ -101,24 +103,39 @@ impl Scene {
 		ambient_light_intensity + lambert_light_intensity
 	}
 
-	fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> LinearRGB {
+	fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> LinearRGB {
+		if max_depth == 0 {
+			return self.background;
+		}
+	
 		match self.trace_to_nearest_object(&ray_origin, &ray_direction) {
 			Some((vobj, dist)) => {
 				let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
 				let surf_prop = vobj.surface.at_point(&intersection_pos);
 				let light_intensity = self.light_on_surface(&intersection_pos, &surf_prop.normal);
-				let color = vobj.texture.color(surf_prop.u, surf_prop.v);
+				let vobj_color = vobj.texture.color(surf_prop.u, surf_prop.v);
 				
-				color.scale(light_intensity)
+				let reflected_color = if vobj.reflectivity != 0.0 {
+					let reflect_ray = angle_of_reflection(&ray_direction, &surf_prop.normal);
+					let reflect_origin = intersection_pos.add(&surf_prop.normal.scale(FLOAT_BIAS));
+					
+					self.cast(&reflect_origin, &reflect_ray, max_depth - 1).scale(vobj.reflectivity)
+				} else {
+					LinearRGB { red: 0.0, green: 0.0, blue: 0.0 }
+				};
+				
+				vobj_color.scale(light_intensity).add(&reflected_color)				
 			}
 			None => self.background,
 		}
 	}
 }
 
+
+
 fn build_scene() -> Scene {
 	let mut scene = Scene {
-		background: LinearRGB { red: 0.0, green: 0.0, blue: 0.0 },
+		background: LinearRGB { red: 0.3, green: 0.5, blue: 0.9 },
 		light_sources: Vec::new(),
 		objects: Vec::new(),
 	};
@@ -129,17 +146,31 @@ fn build_scene() -> Scene {
 	});
 	
 	scene.objects.push(VisObj {
-		surface: Box::new(Sphere::new(&Vec3f { x: 0.0, y: 0.0, z: 1.5 }, 1.0)),
+		surface: Box::new(Sphere::new(&Vec3f { x: 0.0, y: -1.5, z: 1.5 }, 1.0)),
 		texture: Box::new(Checkerboard::new(
 			Box::new(LinearRGB { red: 0.0, green: 0.0, blue: 0.5 }),
 			Box::new(LinearRGB { red: 0.0, green: 0.5, blue: 0.0 }),
 			0.1,
 		)),
+		reflectivity: 0.0,
 	});
 	
 	scene.objects.push(VisObj {
-		surface: Box::new(Sphere::new(&Vec3f { x: 0.0, y: 0.5, z: 0.0 }, 1.0)),
-		texture: Box::new(LinearRGB { red: 0.1, green: 0.0, blue: 0.0 }),
+		surface: Box::new(Sphere::new(&Vec3f { x: 0.0, y: 1.5, z: 1.5 }, 1.0)),
+		texture: Box::new(LinearRGB { red: 0.05, green: 0.0, blue: 0.0 }),
+		reflectivity: 0.9,
+	});
+	
+	scene.objects.push(VisObj {
+		surface: Box::new(Sphere::new(&Vec3f { x: 2.5, y: 0.0, z: 1.5 }, 1.0)),
+		texture: Box::new(LinearRGB { red: 0.01, green: 0.01, blue: 0.01 }),
+		reflectivity: 0.9,
+	});
+	
+	scene.objects.push(VisObj {
+		surface: Box::new(Sphere::new(&Vec3f { x: -2.0, y: 0.0, z: 3.5 }, 1.0)),
+		texture: Box::new(LinearRGB { red: 0.3, green: 0.3, blue: 0.1 }),
+		reflectivity: 0.0,
 	});
 	
 	scene.objects.push(VisObj {
@@ -152,15 +183,16 @@ fn build_scene() -> Scene {
 			Box::new(LinearRGB { red: 0.5, green: 0.5, blue: 0.5 }),
 			Box::new(LinearRGB { red: 0.5, green: 0.0, blue: 0.0 }),
 			0.5,
-		)),			
+		)),
+		reflectivity: 0.025,
 	});
 	
 	scene
 }
 
 fn main() {
-	let width = 640;
-	let height = 480;
+	let width = 1024;
+	let height = 768;
 	let scene = build_scene();
 	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 2.0 }, Vec3f { x: 10.0, y: 0.0, z: -1.0 });
 	
@@ -168,7 +200,7 @@ fn main() {
 	
 	for y in 0..height {
 		for x in 0..width {
-			let (red, green, blue) = scene.cast(&camera.ray_origin(), &camera.ray_direction(x, y)).gamma_correct();
+			let (red, green, blue) = scene.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10).gamma_correct();
 			image.write(red, green, blue);
 		}
 	}
