@@ -1,6 +1,6 @@
 use crate::math::{Vec3f, solve_quadratic};
 
-pub trait Surface {
+pub trait Surface : Sync {
 	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>;
 	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties;
 }

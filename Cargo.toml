@@ -5,6 +5,7 @@ authors = ["Jason Creighton"]
 edition = "2018"
 
 [dependencies]
+rayon = "1.0.3"
 
 [profile.release]
 debug = true

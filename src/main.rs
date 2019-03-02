@@ -3,6 +3,8 @@ mod math;
 mod surface;
 mod texture;
 
+use rayon::prelude::*;
+
 use math::Vec3f;
 use math::angle_of_reflection;
 use surface::*;
@@ -190,18 +192,27 @@ fn build_scene() -> Scene {
 	scene
 }
 
+fn trace_image(scene: &Scene, camera: &Camera, width: i32, height: i32) -> Vec<Vec<LinearRGB>> {
+	(0..height).into_par_iter().map(|y|
+		(0..width).map(|x|
+			scene.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10)
+		).collect()
+	).collect()
+}
+
 fn main() {
-	let width = 1024;
-	let height = 768;
+	let width = 1024*4;
+	let height = 768*4;
 	let scene = build_scene();
 	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 2.0 }, Vec3f { x: 10.0, y: 0.0, z: -1.0 });
+	let image = trace_image(&scene, &camera, width, height);
 	
-	let mut image = ppm::PPMWriter::new("test.ppm", width, height);
+	let mut ppm_out = ppm::PPMWriter::new("test.ppm", width, height);
 	
-	for y in 0..height {
-		for x in 0..width {
-			let (red, green, blue) = scene.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10).gamma_correct();
-			image.write(red, green, blue);
+	for scanline in image {
+		for pixel in scanline {
+			let (red, green, blue) = pixel.gamma_correct();
+			ppm_out.write(red, green, blue);
 		}
 	}
 }

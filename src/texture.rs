@@ -1,4 +1,4 @@
-pub trait Texture {
+pub trait Texture : Sync {
 	fn color(&self, u: f32, v: f32) -> LinearRGB;
 }
 
