@@ -3,10 +3,10 @@ mod math;
 mod surface;
 mod texture;
 
+use std::time::Instant;
 use rayon::prelude::*;
 
-use math::Vec3f;
-use math::angle_of_reflection;
+use math::*;
 use surface::*;
 use texture::*;
 
@@ -133,8 +133,6 @@ impl Scene {
 	}
 }
 
-
-
 fn build_scene() -> Scene {
 	let mut scene = Scene {
 		background: LinearRGB { red: 0.3, green: 0.5, blue: 0.9 },
@@ -182,8 +180,8 @@ fn build_scene() -> Scene {
 			&Vec3f { x: 0.0, y: 1.0, z: 0.0 },
 		)),
 		texture: Box::new(Checkerboard::new(
-			Box::new(LinearRGB { red: 0.5, green: 0.5, blue: 0.5 }),
-			Box::new(LinearRGB { red: 0.5, green: 0.0, blue: 0.0 }),
+			Box::new(LinearRGB { red: 0.2, green: 0.2, blue: 0.2 }),
+			Box::new(LinearRGB { red: 0.6, green: 0.0, blue: 0.0 }),
 			0.5,
 		)),
 		reflectivity: 0.025,
@@ -200,14 +198,39 @@ fn trace_image(scene: &Scene, camera: &Camera, width: i32, height: i32) -> Vec<V
 	).collect()
 }
 
-fn main() {
-	let width = 1024*4;
-	let height = 768*4;
-	let scene = build_scene();
-	let camera = Camera::new(width, height, Vec3f { x: -10.0, y: 0.0, z: 2.0 }, Vec3f { x: 10.0, y: 0.0, z: -1.0 });
-	let image = trace_image(&scene, &camera, width, height);
+fn trace_image_oversampled(scene: &Scene, camera: &Camera, width: i32, height: i32, oversampling_factor: i32) -> Vec<Vec<LinearRGB>> {
+	let sigma = (oversampling_factor as f32) * 0.4;
+	let resampling_kernel = gaussian_kernel(sigma);
+	let extra_points_needed = (resampling_kernel.len() - 1) as i32;
 	
-	let mut ppm_out = ppm::PPMWriter::new("test.ppm", width, height);
+	let oversampled_width = (width * oversampling_factor) + extra_points_needed;
+	let oversampled_height = (height * oversampling_factor) + extra_points_needed;
+	
+	let trace_start = Instant::now();
+	let oversampled_image = trace_image(scene, camera, oversampled_width, oversampled_height);
+	println!("Done tracing in {} ms.", trace_start.elapsed().as_millis());
+	
+	let resize_start = Instant::now();
+	let image = convolve_2d(&oversampled_image, &resampling_kernel, oversampling_factor);
+	println!("Done resizing in {} ms.", resize_start.elapsed().as_millis());
+	
+	image
+}
+
+fn main() {
+	let oversampling_factor = 4;
+	let width = 1024;
+	let height = 768;
+	
+	let scene = build_scene();
+	// TODO: It's awkward to have to tell both the Camera and trace_image_oversampled()
+	// about the oversampling factor
+	let camera = Camera::new(width * oversampling_factor, height * oversampling_factor, Vec3f { x: -10.0, y: 0.0, z: 2.0 }, Vec3f { x: 10.0, y: 0.0, z: -1.0 });
+		
+	let image = trace_image_oversampled(&scene, &camera, width, height, oversampling_factor);
+	
+	let write_start = Instant::now();
+	let mut ppm_out = ppm::PPMWriter::new("test.ppm", image[0].len() as i32, image.len() as i32);
 	
 	for scanline in image {
 		for pixel in scanline {
@@ -215,4 +238,5 @@ fn main() {
 			ppm_out.write(red, green, blue);
 		}
 	}
+	println!("Wrote output in {} ms.", write_start.elapsed().as_millis());
 }
