@@ -152,12 +152,14 @@ fn convolve_and_transpose(image: &[Vec<LinearRGB>], kernel: &[f32], decimation_f
 	// Make sure that the vec of vecs is "square"
 	debug_assert!(image.iter().all(|scanline| scanline.len() == input_width));
 	
+    let zero_color = LinearRGB { red: 0.0, green: 0.0, blue: 0.0 };
 	let kernel_length = kernel.len();
 	let output_width = input_height;
 	let output_height = (input_width - (kernel_length - 1)) / (decimation_factor as usize);
-	let mut output_image : Vec<Vec<LinearRGB>> = (0..output_height).map(|_| Vec::with_capacity(output_width)).collect();
-			
-	let zero_color = LinearRGB { red: 0.0, green: 0.0, blue: 0.0 };
+	let mut output_image : Vec<Vec<LinearRGB>> =
+        (0..output_height).map(|_|
+            (0..output_width).map(|_| zero_color).collect()
+        ).collect();
 	
 	for out_x in 0..output_width {
 		for out_y in 0..output_height {
@@ -169,15 +171,8 @@ fn convolve_and_transpose(image: &[Vec<LinearRGB>], kernel: &[f32], decimation_f
 				.zip(kernel)
 				.map(|(color, coef)| color.scale(*coef))
 				.fold(zero_color, |acc, color| acc.add(&color));
-			
-			// Essentially what we are doing here is:
-			//
-			//     output_image[out_y][out_x] = convolved_pixel
-			//
-			// ...except the vector is empty when we start out, so we have to push()
-			// instead.
-			debug_assert!(out_x == output_image[out_y].len());
-			output_image[out_y].push(convolved_pixel);
+
+			output_image[out_y][out_x] = convolved_pixel;
 		}
 	}
 	
