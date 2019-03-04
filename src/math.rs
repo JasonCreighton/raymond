@@ -145,6 +145,7 @@ pub fn convolve_2d(image: &[Vec<LinearRGB>], kernel: &[f32], decimation_factor: 
 ///
 /// The transposition is intended to allow for the function to easily be
 /// applied twice to an image to result in a 2D convolution, see convolve_2d.
+#[allow(clippy::needless_range_loop)]
 fn convolve_and_transpose(image: &[Vec<LinearRGB>], kernel: &[f32], decimation_factor: i32) -> Vec<Vec<LinearRGB>> {
 	let input_width = image[0].len();
 	let input_height = image.len();
