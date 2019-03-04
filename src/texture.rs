@@ -21,11 +21,7 @@ impl Texture for LinearRGB {
 
 impl Checkerboard {
 	pub fn new(texture1: Box<dyn Texture>, texture2: Box<dyn Texture>, square_size: f32) -> Checkerboard {
-		Checkerboard {
-			texture1: texture1,
-			texture2: texture2,
-			square_size: square_size,
-		}
+		Checkerboard { texture1, texture2, square_size }
 	}
 }
 
@@ -37,7 +33,7 @@ impl Texture for Checkerboard {
 		let square_u = scaled_u - u.floor();
 		let square_v = scaled_v - v.floor();
 		
-		match (square_number + 1000000) % 2 {
+		match (square_number + 1_000_000) % 2 {
 			0 => self.texture1.color(square_u, square_v),
 			1 => self.texture2.color(square_u, square_v),
 			_ => unreachable!(),

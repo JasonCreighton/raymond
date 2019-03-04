@@ -133,12 +133,11 @@ pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 /// Performs a two dimensional convolution against the provided image and returns
 /// a new image. For a W by H image with kernel length K and decimation factor D, the
 /// output dimensions will be (W - (K - 1))/D by (H - (K - 1))/D
-pub fn convolve_2d(image: &Vec<Vec<LinearRGB>>, kernel: &Vec<f32>, decimation_factor: i32) -> Vec<Vec<LinearRGB>> {
-	// We convolve & transpose twice, which results in an untransposed image.
-	let horizontally_convolved = convolve_and_transpose(image, &kernel, decimation_factor);
-	let vertically_convolved = convolve_and_transpose(&horizontally_convolved, &kernel, decimation_factor);
-			
-	vertically_convolved
+pub fn convolve_2d(image: &[Vec<LinearRGB>], kernel: &[f32], decimation_factor: i32) -> Vec<Vec<LinearRGB>> {
+	
+    // We convolve & transpose twice, which results in an untransposed image
+    let flipped = convolve_and_transpose(image, &kernel, decimation_factor);
+    convolve_and_transpose(&flipped, &kernel, decimation_factor)
 }
 
 /// Convolves the given kernel across the image horizontally, and returns a
@@ -146,7 +145,7 @@ pub fn convolve_2d(image: &Vec<Vec<LinearRGB>>, kernel: &Vec<f32>, decimation_fa
 ///
 /// The transposition is intended to allow for the function to easily be
 /// applied twice to an image to result in a 2D convolution, see convolve_2d.
-fn convolve_and_transpose(image: &Vec<Vec<LinearRGB>>, kernel: &Vec<f32>, decimation_factor: i32) -> Vec<Vec<LinearRGB>> {
+fn convolve_and_transpose(image: &[Vec<LinearRGB>], kernel: &[f32], decimation_factor: i32) -> Vec<Vec<LinearRGB>> {
 	let input_width = image[0].len();
 	let input_height = image.len();
 	

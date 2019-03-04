@@ -19,6 +19,6 @@ impl PPMWriter {
 	}
 	
 	pub fn write(&mut self, red: u8, green: u8, blue: u8) {
-		self.file_handle.write(&[red, green, blue]).unwrap();
+		self.file_handle.write_all(&[red, green, blue]).unwrap();
 	}
 }

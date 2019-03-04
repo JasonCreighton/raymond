@@ -43,7 +43,7 @@ impl Sphere {
 	pub fn new(center: &Vec3f, radius: f32) -> Sphere {
 		Sphere {
 			center: *center,
-			radius: radius,
+			radius,
 		}
 	}
 }
@@ -72,15 +72,11 @@ impl Surface for Sphere {
 	
 	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
 		let d = point_on_surface.sub(&self.center).normalize();
-		let surface_normal = point_on_surface.sub(&self.center).normalize();
+		let normal = point_on_surface.sub(&self.center).normalize();
 		let u = 0.5 + d.y.atan2(d.x) / (2.0 * std::f32::consts::PI);
 		let v = 0.5 - d.z.asin() / std::f32::consts::PI;
 		
-		SurfaceProperties {
-			normal: surface_normal,
-			u: u,
-			v: v,
-		}
+		SurfaceProperties { normal, u, v }
 	}
 }
 
@@ -92,7 +88,7 @@ impl Plane {
 			position: *position,
 			u_basis: *u_basis,
 			v_basis: *v_basis,
-			normal: normal,
+			normal,
 		}
 	}
 }
@@ -124,8 +120,8 @@ impl Surface for Plane {
 		
 		SurfaceProperties {
 			normal: self.normal,
-			u: u,
-			v: v,
+			u,
+			v,
 		}
 
 	}
