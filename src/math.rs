@@ -1,3 +1,4 @@
+/// 3-D vector or position
 #[derive(Debug, Copy, Clone)]
 pub struct Vec3f {
 	pub x: f32,
@@ -5,6 +6,8 @@ pub struct Vec3f {
 	pub z: f32,
 }
 
+/// "Linear" RGB value. (ie, SRGB without gamma correction)
+/// Component values fall in [0.0, 1.0]
 #[derive(Debug, Copy, Clone)]
 pub struct LinearRGB {
 	pub red: f32,
@@ -63,7 +66,8 @@ impl LinearRGB {
 		// but it is close enough.)
 		(linear_value.max(0.0).min(1.0).powf(1.0/2.2) * 255.0) as u8
 	}
-
+	
+	/// Produce a 24-bit SRGB value
 	pub fn gamma_correct(&self) -> (u8, u8, u8) {
 		(
 			LinearRGB::gamma_correct_component(self.red),
@@ -90,6 +94,8 @@ impl LinearRGB {
 	}
 }
 
+/// Finds the roots of the equation ax^2 + bx + c = 0. Returns None if there is
+/// no solution, 
 pub fn solve_quadratic(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
 	let discriminant = (b*b) - 4.0*a*c;
 	// The single solution case tends to be degenerate, we only find the two solution case
@@ -104,10 +110,13 @@ pub fn solve_quadratic(a: f32, b: f32, c: f32) -> Option<(f32, f32)> {
 	}
 }
 
+/// Finds the angle of reflection of an incident ray against a surface with the
+/// normal vector.
 pub fn angle_of_reflection(incident: &Vec3f, normal: &Vec3f) -> Vec3f {
 	incident.sub(&normal.scale(2.0 * incident.dot(normal)))
 }
 
+/// Generates a gaussian shaped filter for, eg, a Gaussian blur
 pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 	let half_kernel_length = (sigma * 3.0).ceil() as i32;
 	// We always use a symmetric, odd-length kernel
@@ -121,6 +130,9 @@ pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 		.collect()
 }
 
+/// Performs a two dimensional convolution against the provided image and returns
+/// a new image. For a W by H image with kernel length K and decimation factor D, the
+/// output dimensions will be (W - (K - 1))/D by (H - (K - 1))/D
 pub fn convolve_2d(image: &Vec<Vec<LinearRGB>>, kernel: &Vec<f32>, decimation_factor: i32) -> Vec<Vec<LinearRGB>> {
 	// We convolve & transpose twice, which results in an untransposed image.
 	let horizontally_convolved = convolve_and_transpose(image, &kernel, decimation_factor);
@@ -138,6 +150,7 @@ fn convolve_and_transpose(image: &Vec<Vec<LinearRGB>>, kernel: &Vec<f32>, decima
 	let input_width = image[0].len();
 	let input_height = image.len();
 	
+	// Make sure that the vec of vecs is "square"
 	debug_assert!(image.iter().all(|scanline| scanline.len() == input_width));
 	
 	let kernel_length = kernel.len();
@@ -158,10 +171,19 @@ fn convolve_and_transpose(image: &Vec<Vec<LinearRGB>>, kernel: &Vec<f32>, decima
 				.map(|(color, coef)| color.scale(*coef))
 				.fold(zero_color, |acc, color| acc.add(&color));
 			
+			// Essentially what we are doing here is:
+			//
+			//     output_image[out_y][out_x] = convolved_pixel
+			//
+			// ...except the vector is empty when we start out, so we have to push()
+			// instead.
+			debug_assert!(out_x == output_image[out_y].len());
 			output_image[out_y].push(convolved_pixel);
 		}
 	}
 	
+	// If we did everything right, the output vec of vecs should be the right
+	// dimensions
 	debug_assert!(output_image.len() == output_height);
 	debug_assert!(output_image.iter().all(|scanline| scanline.len() == output_width));
 	

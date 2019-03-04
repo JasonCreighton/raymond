@@ -1,10 +1,21 @@
 use crate::math::{Vec3f, solve_quadratic};
 
+/// A Surface is a 2-D surface positioned and oriented in 3-D space which can be
+/// tested for intersection and points on the surface can be mapped to a 2-D
+/// (u, v) space, which is then typically translated to a color using a Texture.
 pub trait Surface : Sync {
+	/// Find an intersection with the suraface. Returns the scaling factor of ray_direction
+	/// from ray_origin that results in an intersection with the surface, if it exists.
 	fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32>;
+	
+	/// For a point that was previously returned by intersection_with_ray(), find
+	/// its properties. (Calling with a point not on the surface will probably yield
+	/// non-sensical results.)
 	fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties;
 }
 
+/// SurfaceProperties describes a surface at a given point, consisting of the normal
+/// vector and the position in (u,v) space on an associated texture.
 #[derive(Debug, Copy, Clone)]
 pub struct SurfaceProperties {
 	pub normal: Vec3f,
@@ -12,12 +23,14 @@ pub struct SurfaceProperties {
 	pub v: f32,
 }
 
+/// Perfect mathematical sphere
 #[derive(Debug, Copy, Clone)]
 pub struct Sphere {
 	center: Vec3f,
 	radius: f32,
 }
 
+/// Infinite plane including the point "position"
 #[derive(Debug, Copy, Clone)]
 pub struct Plane {
 	position: Vec3f,

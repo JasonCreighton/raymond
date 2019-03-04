@@ -1,15 +1,18 @@
 use crate::math::LinearRGB;
 
+/// A Texture maps a (u, v) coordinate on a Surface into a color
 pub trait Texture : Sync {
 	fn color(&self, u: f32, v: f32) -> LinearRGB;
 }
 
+/// Infinite checkerboard pattern, alternating between two "sub Textures"
 pub struct Checkerboard {	
 	texture1: Box<dyn Texture>,
 	texture2: Box<dyn Texture>,
 	square_size: f32,
 }
 
+/// A color can be used as a Texture
 impl Texture for LinearRGB {
 	fn color(&self, _u: f32, _v: f32) -> LinearRGB {
 		*self
