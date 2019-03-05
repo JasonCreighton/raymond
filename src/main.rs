@@ -358,12 +358,13 @@ fn main() {
     let image = trace_image_oversampled(&scene, &camera, width, height, oversampling_factor);
 
     let write_start = Instant::now();
-    let mut ppm_out = ppm::PPMWriter::new("test.ppm", image[0].len() as i32, image.len() as i32);
+    let mut ppm_out =
+        ppm::PPMWriter::new("test.ppm", image[0].len() as i32, image.len() as i32).unwrap();
 
     for scanline in image {
         for pixel in scanline {
             let (red, green, blue) = pixel.gamma_correct();
-            ppm_out.write(red, green, blue);
+            ppm_out.write(red, green, blue).unwrap();
         }
     }
     println!("Wrote output in {} ms.", write_start.elapsed().as_millis());
