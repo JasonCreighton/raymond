@@ -8,7 +8,7 @@ use crate::texture::Texture;
 // detect the object that we are on due to floating point rounding issues.
 // Therefore, we add a slight bias in the direction of the surface normal to
 // avoid this.
-const FLOAT_BIAS: f32 = 0.0001;
+const FLOAT_BIAS: f32 = 0.001;
 
 #[derive(Debug, Copy, Clone)]
 pub struct LightSource {
@@ -96,18 +96,20 @@ impl Scene {
         height: i32,
         oversampling_factor: i32,
     ) -> Vec<Vec<LinearRGB>> {
-        let sigma = (oversampling_factor as f32) * 0.4;
-        let resampling_kernel = gaussian_kernel(sigma);
-        let extra_points_needed = (resampling_kernel.len() - 1) as i32;
+        if oversampling_factor > 1 {
+            let sigma = (oversampling_factor as f32) * 0.4;
+            let resampling_kernel = gaussian_kernel(sigma);
+            let extra_points_needed = (resampling_kernel.len() - 1) as i32;
 
-        let oversampled_width = (width * oversampling_factor) + extra_points_needed;
-        let oversampled_height = (height * oversampling_factor) + extra_points_needed;
+            let oversampled_width = (width * oversampling_factor) + extra_points_needed;
+            let oversampled_height = (height * oversampling_factor) + extra_points_needed;
 
-        let oversampled_image = self.trace_image(camera, oversampled_width, oversampled_height);
+            let oversampled_image = self.trace_image(camera, oversampled_width, oversampled_height);
 
-        let image = convolve_2d(&oversampled_image, &resampling_kernel, oversampling_factor);
-
-        image
+            convolve_2d(&oversampled_image, &resampling_kernel, oversampling_factor)
+        } else {
+            self.trace_image(camera, width, height)
+        }
     }
     fn trace_to_nearest_object(
         &self,

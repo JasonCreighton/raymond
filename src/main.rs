@@ -4,12 +4,35 @@ mod scene;
 mod surface;
 mod texture;
 
+use rand::random;
 use std::time::Instant;
 
 use math::*;
 use scene::*;
 use surface::*;
 use texture::*;
+
+fn random_sphere() -> VisObj {
+    VisObj {
+        surface: Box::new(Sphere::new(
+            &Vec3f {
+                x: random::<f32>() * 50.0,
+                y: random::<f32>() * 10.0 - 5.0,
+                z: random::<f32>() * 5.0,
+            },
+            0.5,
+        )),
+        texture: Box::new(LinearRGB {
+            red: 0.0,
+            green: 0.0,
+            blue: 0.0,
+            //red: random::<f32>(),
+            //green: random::<f32>(),
+            //blue: random::<f32>(),
+        }),
+        reflectivity: 0.9,
+    }
+}
 
 fn build_scene() -> Scene {
     let mut scene = Scene {
@@ -31,82 +54,7 @@ fn build_scene() -> Scene {
         intensity: 5.0,
     });
 
-    scene.objects.push(VisObj {
-        surface: Box::new(Sphere::new(
-            &Vec3f {
-                x: 0.0,
-                y: -1.5,
-                z: 1.5,
-            },
-            1.0,
-        )),
-        texture: Box::new(Checkerboard::new(
-            Box::new(LinearRGB {
-                red: 0.0,
-                green: 0.0,
-                blue: 0.5,
-            }),
-            Box::new(LinearRGB {
-                red: 0.0,
-                green: 0.5,
-                blue: 0.0,
-            }),
-            0.1,
-        )),
-        reflectivity: 0.0,
-    });
-
-    scene.objects.push(VisObj {
-        surface: Box::new(Sphere::new(
-            &Vec3f {
-                x: 0.0,
-                y: 1.5,
-                z: 1.5,
-            },
-            1.0,
-        )),
-        texture: Box::new(LinearRGB {
-            red: 0.05,
-            green: 0.0,
-            blue: 0.0,
-        }),
-        reflectivity: 0.9,
-    });
-
-    scene.objects.push(VisObj {
-        surface: Box::new(Sphere::new(
-            &Vec3f {
-                x: 2.5,
-                y: 0.0,
-                z: 1.5,
-            },
-            1.0,
-        )),
-        texture: Box::new(LinearRGB {
-            red: 0.01,
-            green: 0.01,
-            blue: 0.01,
-        }),
-        reflectivity: 0.9,
-    });
-
-    scene.objects.push(VisObj {
-        surface: Box::new(Sphere::new(
-            &Vec3f {
-                x: -2.0,
-                y: 0.0,
-                z: 3.5,
-            },
-            1.0,
-        )),
-        texture: Box::new(LinearRGB {
-            red: 0.3,
-            green: 0.3,
-            blue: 0.1,
-        }),
-        reflectivity: 0.0,
-    });
-
+    // Checkboard infinite plane
     scene.objects.push(VisObj {
         surface: Box::new(Plane::new(
             &Vec3f {
@@ -141,11 +89,15 @@ fn build_scene() -> Scene {
         reflectivity: 0.025,
     });
 
+    for _ in 0..100 {
+        scene.objects.push(random_sphere());
+    }
+
     scene
 }
 
 fn main() {
-    let oversampling_factor = 4;
+    let oversampling_factor = 1;
     let width = 1024;
     let height = 768;
 
