@@ -3,6 +3,7 @@ use rayon::prelude::*;
 use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, LinearRGB, Vec3f};
 use crate::surface::Surface;
 use crate::texture::Texture;
+use crate::util::Array2D;
 
 // If we try to trace from the exact position on a surface, sometimes we will
 // detect the object that we are on due to floating point rounding issues.
@@ -78,15 +79,19 @@ impl Camera {
 }
 
 impl Scene {
-    pub fn trace_image(&self, camera: &Camera, width: i32, height: i32) -> Vec<Vec<LinearRGB>> {
-        (0..height)
-            .into_par_iter()
-            .map(|y| {
-                (0..width)
-                    .map(|x| self.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10))
-                    .collect()
+    pub fn trace_image(&self, camera: &Camera, width: i32, height: i32) -> Array2D<LinearRGB> {
+        let mut image = Array2D::new(height as usize, width as usize, &LinearRGB::BLACK);
+
+        // Can't figure out how to get Rayon to use my iterator directly, so I
+        // convert to a vec of references first.
+        let mut tmp: Vec<&mut [LinearRGB]> = image.iter_rows_mut().collect();
+        tmp.par_iter_mut().zip(0..height).for_each(|(row, y)| {
+            row.iter_mut().zip(0..width).for_each(|(pixel, x)| {
+                *pixel = self.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10);
             })
-            .collect()
+        });
+
+        image
     }
 
     pub fn trace_image_oversampled(
@@ -95,7 +100,7 @@ impl Scene {
         width: i32,
         height: i32,
         oversampling_factor: i32,
-    ) -> Vec<Vec<LinearRGB>> {
+    ) -> Array2D<LinearRGB> {
         if oversampling_factor > 1 {
             let sigma = (oversampling_factor as f32) * 0.4;
             let resampling_kernel = gaussian_kernel(sigma);

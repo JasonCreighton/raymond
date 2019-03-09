@@ -1,3 +1,5 @@
+use crate::util::Array2D;
+
 /// 3-D vector or position
 #[derive(Debug, Copy, Clone)]
 pub struct Vec3f {
@@ -64,6 +66,12 @@ impl Vec3f {
 }
 
 impl LinearRGB {
+    pub const BLACK: LinearRGB = LinearRGB {
+        red: 0.0,
+        green: 0.0,
+        blue: 0.0,
+    };
+
     fn gamma_correct_component(linear_value: f32) -> u8 {
         // Clamp to [0.0, 1.0] and apply gamma correction transfer function
         // (I am not a color space expert and I don't think this is quite correct
@@ -138,10 +146,10 @@ pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 /// a new image. For a W by H image with kernel length K and decimation factor D, the
 /// output dimensions will be (W - (K - 1))/D by (H - (K - 1))/D
 pub fn convolve_2d(
-    image: &[Vec<LinearRGB>],
+    image: &Array2D<LinearRGB>,
     kernel: &[f32],
     decimation_factor: i32,
-) -> Vec<Vec<LinearRGB>> {
+) -> Array2D<LinearRGB> {
     // We convolve & transpose twice, which results in an untransposed image
     let flipped = convolve_and_transpose(image, &kernel, decimation_factor);
     convolve_and_transpose(&flipped, &kernel, decimation_factor)
@@ -154,49 +162,32 @@ pub fn convolve_2d(
 /// applied twice to an image to result in a 2D convolution, see convolve_2d.
 #[allow(clippy::needless_range_loop)]
 fn convolve_and_transpose(
-    image: &[Vec<LinearRGB>],
+    image: &Array2D<LinearRGB>,
     kernel: &[f32],
     decimation_factor: i32,
-) -> Vec<Vec<LinearRGB>> {
-    let input_width = image[0].len();
-    let input_height = image.len();
-
-    // Make sure that the vec of vecs is "square"
-    debug_assert!(image.iter().all(|scanline| scanline.len() == input_width));
-
-    let zero_color = LinearRGB {
-        red: 0.0,
-        green: 0.0,
-        blue: 0.0,
-    };
+) -> Array2D<LinearRGB> {
+    let input_width = image.columns;
+    let input_height = image.rows;
     let kernel_length = kernel.len();
     let output_width = input_height;
     let output_height = (input_width - (kernel_length - 1)) / (decimation_factor as usize);
-    let mut output_image: Vec<Vec<LinearRGB>> = (0..output_height)
-        .map(|_| (0..output_width).map(|_| zero_color).collect())
-        .collect();
+    let mut output_image = Array2D::new(output_height, output_width, &LinearRGB::BLACK);
 
     for out_x in 0..output_width {
         for out_y in 0..output_height {
             let in_x = out_y * (decimation_factor as usize);
             let in_y = out_x;
 
-            let convolved_pixel = image[in_y][in_x..(in_x + kernel_length)]
+            let convolved_pixel = image
+                .slice_within_row(in_y, in_x..(in_x + kernel_length))
                 .iter()
                 .zip(kernel)
                 .map(|(color, coef)| color.scale(*coef))
-                .fold(zero_color, |acc, color| acc.add(&color));
+                .fold(LinearRGB::BLACK, |acc, color| acc.add(&color));
 
-            output_image[out_y][out_x] = convolved_pixel;
+            output_image.set(out_y, out_x, &convolved_pixel);
         }
     }
-
-    // If we did everything right, the output vec of vecs should be the right
-    // dimensions
-    debug_assert!(output_image.len() == output_height);
-    debug_assert!(output_image
-        .iter()
-        .all(|scanline| scanline.len() == output_width));
 
     output_image
 }

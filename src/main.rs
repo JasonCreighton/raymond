@@ -3,6 +3,7 @@ mod ppm;
 mod scene;
 mod surface;
 mod texture;
+mod util;
 
 use rand::random;
 use std::time::Instant;
@@ -125,9 +126,9 @@ fn main() {
 
     let write_start = Instant::now();
     let mut ppm_out =
-        ppm::PPMWriter::new("test.ppm", image[0].len() as i32, image.len() as i32).unwrap();
+        ppm::PPMWriter::new("test.ppm", image.columns as i32, image.rows as i32).unwrap();
 
-    for scanline in image {
+    for scanline in image.iter_rows() {
         for pixel in scanline {
             let (red, green, blue) = pixel.gamma_correct();
             ppm_out.write(red, green, blue).unwrap();
