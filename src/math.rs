@@ -197,7 +197,7 @@ fn convolve_and_transpose(
 /// Returns the number of iterations it took for a given point on the complex plane to
 /// diverge from close to zero, or None if it does not happen after a large number of
 /// iterations.
-pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<i32> {
+pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<f32> {
     const MAX_ITERATIONS: i32 = 100;
 
     let mut z = Complex::new(0.0, 0.0);
@@ -208,11 +208,17 @@ pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<i32> {
         i += 1;
 
         if z.norm_sqr() > 4.0 {
-            return Some(i);
+            break;
         }
 
         if i == MAX_ITERATIONS {
+            // It didn't escape quickly, we say the point is in the set
             return None;
         }
     }
+
+    // We did escape, now we need to figure out the "fractional iteration"
+    // See https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
+    let escape_time = (i as f32) - z.norm_sqr().log2().log2() + 4.0;
+    Some(escape_time)
 }

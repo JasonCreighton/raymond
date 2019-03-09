@@ -59,7 +59,7 @@ impl Texture for MandelbrotSet {
         let escape_time = mandelbrot_escape_time(Complex::new(u * 0.5, v * 0.5));
         match escape_time {
             Some(t) => {
-                let brightness = (t as f32) / 100.0;
+                let brightness = t / 100.0;
                 LinearRGB {
                     red: brightness,
                     green: brightness,
