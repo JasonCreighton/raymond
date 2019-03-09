@@ -1,3 +1,5 @@
+use num_complex::Complex;
+
 use crate::util::Array2D;
 
 /// 3-D vector or position
@@ -190,4 +192,27 @@ fn convolve_and_transpose(
     }
 
     output_image
+}
+
+/// Returns the number of iterations it took for a given point on the complex plane to
+/// diverge from close to zero, or None if it does not happen after a large number of
+/// iterations.
+pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<i32> {
+    const MAX_ITERATIONS: i32 = 100;
+
+    let mut z = Complex::new(0.0, 0.0);
+    let mut i = 0;
+
+    loop {
+        z = z * z + c;
+        i += 1;
+
+        if z.norm_sqr() > 4.0 {
+            return Some(i);
+        }
+
+        if i == MAX_ITERATIONS {
+            return None;
+        }
+    }
 }

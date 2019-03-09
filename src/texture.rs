@@ -1,4 +1,6 @@
-use crate::math::LinearRGB;
+use num_complex::Complex;
+
+use crate::math::{mandelbrot_escape_time, LinearRGB};
 
 /// A Texture maps a (u, v) coordinate on a Surface into a color
 pub trait Texture: Sync {
@@ -11,6 +13,9 @@ pub struct Checkerboard {
     texture2: Box<dyn Texture>,
     square_size: f32,
 }
+
+/// Texture representing the Mandelbrot set
+pub struct MandelbrotSet;
 
 /// A color can be used as a Texture
 impl Texture for LinearRGB {
@@ -45,6 +50,23 @@ impl Texture for Checkerboard {
             0 => self.texture1.color(square_u, square_v),
             1 => self.texture2.color(square_u, square_v),
             _ => unreachable!(),
+        }
+    }
+}
+
+impl Texture for MandelbrotSet {
+    fn color(&self, u: f32, v: f32) -> LinearRGB {
+        let escape_time = mandelbrot_escape_time(Complex::new(u * 0.5, v * 0.5));
+        match escape_time {
+            Some(t) => {
+                let brightness = (t as f32) / 100.0;
+                LinearRGB {
+                    red: brightness,
+                    green: brightness,
+                    blue: brightness,
+                }
+            }
+            None => LinearRGB::BLACK,
         }
     }
 }
