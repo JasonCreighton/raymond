@@ -13,7 +13,7 @@ pub struct Vec3f {
 /// "Linear" RGB value. (ie, SRGB without gamma correction)
 /// Component values fall in [0.0, 1.0]
 #[derive(Debug, Copy, Clone)]
-pub struct LinearRGB {
+pub struct RGB {
     pub red: f32,
     pub green: f32,
     pub blue: f32,
@@ -67,40 +67,50 @@ impl Vec3f {
     }
 }
 
-impl LinearRGB {
-    pub const BLACK: LinearRGB = LinearRGB {
+impl RGB {
+    pub const BLACK: RGB = RGB {
         red: 0.0,
         green: 0.0,
         blue: 0.0,
     };
 
-    fn gamma_correct_component(linear_value: f32) -> u8 {
-        // Clamp to [0.0, 1.0] and apply gamma correction transfer function
-        // (I am not a color space expert and I don't think this is quite correct
-        // but it is close enough.)
-        (linear_value.max(0.0).min(1.0).powf(1.0 / 2.2) * 255.0) as u8
+    /// Produce a 24-bit RGB value (It is assumed that the caller has already converted
+    /// to SRGB with linear_to_srgb())
+    pub fn to_rgb24(&self) -> (u8, u8, u8) {
+        (
+            (self.red * 255.0) as u8,
+            (self.green * 255.0) as u8,
+            (self.blue * 255.0) as u8,
+        )
     }
 
-    /// Produce a 24-bit SRGB value
-    pub fn gamma_correct(&self) -> (u8, u8, u8) {
-        (
-            LinearRGB::gamma_correct_component(self.red),
-            LinearRGB::gamma_correct_component(self.green),
-            LinearRGB::gamma_correct_component(self.blue),
-        )
+    fn map(&self, f: impl Fn(f32) -> f32) -> RGB {
+        RGB {
+            red: f(self.red),
+            green: f(self.green),
+            blue: f(self.blue),
+        }
+    }
+
+    pub fn linear_to_srgb(&self) -> RGB {
+        self.map(|x| x.powf(1.0 / 2.2))
+    }
+
+    pub fn srgb_to_linear(&self) -> RGB {
+        self.map(|x| x.powf(2.2))
     }
 
     // TODO: Very similar to Vec3f functionality, and one could imagine use for other
     // methods from Vec3f as well, maybe there is a way to factor out the common methods.
-    pub fn scale(&self, factor: f32) -> LinearRGB {
-        LinearRGB {
+    pub fn scale(&self, factor: f32) -> RGB {
+        RGB {
             red: self.red * factor,
             green: self.green * factor,
             blue: self.blue * factor,
         }
     }
-    pub fn add(&self, other: &LinearRGB) -> LinearRGB {
-        LinearRGB {
+    pub fn add(&self, other: &RGB) -> RGB {
+        RGB {
             red: self.red + other.red,
             green: self.green + other.green,
             blue: self.blue + other.blue,
@@ -147,11 +157,7 @@ pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 /// Performs a two dimensional convolution against the provided image and returns
 /// a new image. For a W by H image with kernel length K and decimation factor D, the
 /// output dimensions will be (W - (K - 1))/D by (H - (K - 1))/D
-pub fn convolve_2d(
-    image: &Array2D<LinearRGB>,
-    kernel: &[f32],
-    decimation_factor: i32,
-) -> Array2D<LinearRGB> {
+pub fn convolve_2d(image: &Array2D<RGB>, kernel: &[f32], decimation_factor: i32) -> Array2D<RGB> {
     // We convolve & transpose twice, which results in an untransposed image
     let flipped = convolve_and_transpose(image, &kernel, decimation_factor);
     convolve_and_transpose(&flipped, &kernel, decimation_factor)
@@ -164,16 +170,16 @@ pub fn convolve_2d(
 /// applied twice to an image to result in a 2D convolution, see convolve_2d.
 #[allow(clippy::needless_range_loop)]
 fn convolve_and_transpose(
-    image: &Array2D<LinearRGB>,
+    image: &Array2D<RGB>,
     kernel: &[f32],
     decimation_factor: i32,
-) -> Array2D<LinearRGB> {
+) -> Array2D<RGB> {
     let input_width = image.columns;
     let input_height = image.rows;
     let kernel_length = kernel.len();
     let output_width = input_height;
     let output_height = (input_width - (kernel_length - 1)) / (decimation_factor as usize);
-    let mut output_image = Array2D::new(output_height, output_width, &LinearRGB::BLACK);
+    let mut output_image = Array2D::new(output_height, output_width, &RGB::BLACK);
 
     for out_x in 0..output_width {
         for out_y in 0..output_height {
@@ -185,7 +191,7 @@ fn convolve_and_transpose(
                 .iter()
                 .zip(kernel)
                 .map(|(color, coef)| color.scale(*coef))
-                .fold(LinearRGB::BLACK, |acc, color| acc.add(&color));
+                .fold(RGB::BLACK, |acc, color| acc.add(&color));
 
             output_image.set(out_y, out_x, &convolved_pixel);
         }
@@ -219,6 +225,22 @@ pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<f32> {
 
     // We did escape, now we need to figure out the "fractional iteration"
     // See https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
+    //
+    // TODO: There is still some "banding" visible in the outer regions,
+    // need to figure out if this math is wrong or if there is a precision
+    // issue or what.
     let escape_time = (i as f32) - z.norm_sqr().log2().log2() + 4.0;
     Some(escape_time)
+}
+
+/// Linearlly interpolates into a grid of colors, wrapping a circular manner if index
+/// exceeds the length of the grid.
+pub fn linear_interpolation(grid: &[RGB], index: f32) -> RGB {
+    let base_index = index as usize;
+    let fractional_index = index - (base_index as f32);
+    let a = grid[base_index % grid.len()];
+    let b = grid[(base_index + 1) % grid.len()];
+
+    a.scale(1.0 - fractional_index)
+        .add(&b.scale(fractional_index))
 }

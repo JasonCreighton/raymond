@@ -17,13 +17,13 @@ fn random_sphere() -> VisObj {
     VisObj {
         surface: Box::new(Sphere::new(
             &Vec3f {
-                x: random::<f32>() * 50.0,
+                x: random::<f32>() * 10.0,
                 y: random::<f32>() * 10.0 - 5.0,
                 z: random::<f32>() * 5.0,
             },
-            0.5,
+            1.0,
         )),
-        texture: Box::new(LinearRGB {
+        texture: Box::new(RGB {
             red: 0.0,
             green: 0.0,
             blue: 0.0,
@@ -37,7 +37,7 @@ fn random_sphere() -> VisObj {
 
 fn build_scene() -> Scene {
     let mut scene = Scene {
-        background: LinearRGB {
+        background: RGB {
             red: 0.3,
             green: 0.5,
             blue: 0.9,
@@ -55,7 +55,39 @@ fn build_scene() -> Scene {
         intensity: 5.0,
     });
 
-    // Checkboard infinite plane
+    let mut colormap = Vec::new();
+    colormap.push(RGB {
+        red: 0.0,
+        green: 0.0,
+        blue: 0.25,
+    });
+    colormap.push(RGB {
+        red: 0.0,
+        green: 0.0,
+        blue: 0.5,
+    });
+    colormap.push(RGB {
+        red: 0.0,
+        green: 0.5,
+        blue: 0.5,
+    });
+    colormap.push(RGB {
+        red: 0.5,
+        green: 0.5,
+        blue: 0.0,
+    });
+    colormap.push(RGB {
+        red: 0.5,
+        green: 0.0,
+        blue: 0.0,
+    });
+    colormap.push(RGB {
+        red: 0.25,
+        green: 0.0,
+        blue: 0.0,
+    });
+
+    // Infinite plane of the Mandelbrot Set
     scene.objects.push(VisObj {
         surface: Box::new(Plane::new(
             &Vec3f {
@@ -74,23 +106,11 @@ fn build_scene() -> Scene {
                 z: 0.0,
             },
         )),
-        texture: Box::new(Checkerboard::new(
-            Box::new(LinearRGB {
-                red: 0.2,
-                green: 0.2,
-                blue: 0.2,
-            }),
-            Box::new(LinearRGB {
-                red: 0.6,
-                green: 0.0,
-                blue: 0.0,
-            }),
-            0.5,
-        )),
-        reflectivity: 0.025,
+        texture: Box::new(MandelbrotSet { colormap }),
+        reflectivity: 0.0,
     });
 
-    for _ in 0..100 {
+    for _ in 0..10 {
         scene.objects.push(random_sphere());
     }
 
@@ -98,7 +118,7 @@ fn build_scene() -> Scene {
 }
 
 fn main() {
-    let oversampling_factor = 1;
+    let oversampling_factor = 2;
     let width = 1024;
     let height = 768;
 
@@ -109,7 +129,7 @@ fn main() {
         width * oversampling_factor,
         height * oversampling_factor,
         Vec3f {
-            x: -10.0,
+            x: -11.0,
             y: 0.0,
             z: 2.0,
         },
@@ -130,7 +150,7 @@ fn main() {
 
     for scanline in image.iter_rows() {
         for pixel in scanline {
-            let (red, green, blue) = pixel.gamma_correct();
+            let (red, green, blue) = pixel.linear_to_srgb().to_rgb24();
             ppm_out.write(red, green, blue).unwrap();
         }
     }

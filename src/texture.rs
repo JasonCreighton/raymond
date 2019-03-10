@@ -1,10 +1,10 @@
 use num_complex::Complex;
 
-use crate::math::{mandelbrot_escape_time, LinearRGB};
+use crate::math::{linear_interpolation, mandelbrot_escape_time, RGB};
 
 /// A Texture maps a (u, v) coordinate on a Surface into a color
 pub trait Texture: Sync {
-    fn color(&self, u: f32, v: f32) -> LinearRGB;
+    fn color(&self, u: f32, v: f32) -> RGB;
 }
 
 /// Infinite checkerboard pattern, alternating between two "sub Textures"
@@ -15,11 +15,13 @@ pub struct Checkerboard {
 }
 
 /// Texture representing the Mandelbrot set
-pub struct MandelbrotSet;
+pub struct MandelbrotSet {
+    pub colormap: Vec<RGB>,
+}
 
 /// A color can be used as a Texture
-impl Texture for LinearRGB {
-    fn color(&self, _u: f32, _v: f32) -> LinearRGB {
+impl Texture for RGB {
+    fn color(&self, _u: f32, _v: f32) -> RGB {
         *self
     }
 }
@@ -39,7 +41,7 @@ impl Checkerboard {
 }
 
 impl Texture for Checkerboard {
-    fn color(&self, u: f32, v: f32) -> LinearRGB {
+    fn color(&self, u: f32, v: f32) -> RGB {
         let scaled_u = u / self.square_size;
         let scaled_v = v / self.square_size;
         let square_number = (scaled_u.floor() + scaled_v.floor()) as i32;
@@ -55,18 +57,14 @@ impl Texture for Checkerboard {
 }
 
 impl Texture for MandelbrotSet {
-    fn color(&self, u: f32, v: f32) -> LinearRGB {
+    fn color(&self, u: f32, v: f32) -> RGB {
         let escape_time = mandelbrot_escape_time(Complex::new(u * 0.5, v * 0.5));
         match escape_time {
             Some(t) => {
-                let brightness = t / 100.0;
-                LinearRGB {
-                    red: brightness,
-                    green: brightness,
-                    blue: brightness,
-                }
+                let index = t * 0.75;
+                linear_interpolation(&self.colormap, index).srgb_to_linear()
             }
-            None => LinearRGB::BLACK,
+            None => RGB::BLACK,
         }
     }
 }

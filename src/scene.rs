@@ -1,6 +1,6 @@
 use rayon::prelude::*;
 
-use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, LinearRGB, Vec3f};
+use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, RGB};
 use crate::surface::Surface;
 use crate::texture::Texture;
 use crate::util::Array2D;
@@ -24,7 +24,7 @@ pub struct VisObj {
 }
 
 pub struct Scene {
-    pub background: LinearRGB,
+    pub background: RGB,
     pub light_sources: Vec<LightSource>,
     pub objects: Vec<VisObj>,
 }
@@ -79,12 +79,12 @@ impl Camera {
 }
 
 impl Scene {
-    pub fn trace_image(&self, camera: &Camera, width: i32, height: i32) -> Array2D<LinearRGB> {
-        let mut image = Array2D::new(height as usize, width as usize, &LinearRGB::BLACK);
+    pub fn trace_image(&self, camera: &Camera, width: i32, height: i32) -> Array2D<RGB> {
+        let mut image = Array2D::new(height as usize, width as usize, &RGB::BLACK);
 
         // Can't figure out how to get Rayon to use my iterator directly, so I
         // convert to a vec of references first.
-        let mut tmp: Vec<&mut [LinearRGB]> = image.iter_rows_mut().collect();
+        let mut tmp: Vec<&mut [RGB]> = image.iter_rows_mut().collect();
         tmp.par_iter_mut().zip(0..height).for_each(|(row, y)| {
             row.iter_mut().zip(0..width).for_each(|(pixel, x)| {
                 *pixel = self.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10);
@@ -100,7 +100,7 @@ impl Scene {
         width: i32,
         height: i32,
         oversampling_factor: i32,
-    ) -> Array2D<LinearRGB> {
+    ) -> Array2D<RGB> {
         if oversampling_factor > 1 {
             let sigma = (oversampling_factor as f32) * 0.4;
             let resampling_kernel = gaussian_kernel(sigma);
@@ -159,7 +159,7 @@ impl Scene {
         ambient_light_intensity + lambert_light_intensity
     }
 
-    fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> LinearRGB {
+    fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> RGB {
         if max_depth == 0 {
             return self.background;
         }
@@ -178,11 +178,7 @@ impl Scene {
                     self.cast(&reflect_origin, &reflect_ray, max_depth - 1)
                         .scale(vobj.reflectivity)
                 } else {
-                    LinearRGB {
-                        red: 0.0,
-                        green: 0.0,
-                        blue: 0.0,
-                    }
+                    RGB::BLACK
                 };
 
                 vobj_color.scale(light_intensity).add(&reflected_color)
