@@ -61,7 +61,7 @@ impl Texture for MandelbrotSet {
         let escape_time = mandelbrot_escape_time(Complex::new(u * 0.5, v * 0.5));
         match escape_time {
             Some(t) => {
-                let index = t * 0.75;
+                let index = t * 0.25;
                 linear_interpolation(&self.colormap, index).srgb_to_linear()
             }
             None => RGB::BLACK,

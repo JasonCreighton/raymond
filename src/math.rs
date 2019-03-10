@@ -205,6 +205,9 @@ fn convolve_and_transpose(
 /// iterations.
 pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<f32> {
     const MAX_ITERATIONS: i32 = 100;
+    // To avoid banding in our smooth shading equation, it is necessary to extend the escape
+    // radius beyond the usual 2.0.
+    const ESCAPE_RADIUS: f32 = 50.0;
 
     let mut z = Complex::new(0.0, 0.0);
     let mut i = 0;
@@ -213,7 +216,7 @@ pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<f32> {
         z = z * z + c;
         i += 1;
 
-        if z.norm_sqr() > 4.0 {
+        if z.norm_sqr() > (ESCAPE_RADIUS * ESCAPE_RADIUS) {
             break;
         }
 
@@ -225,11 +228,8 @@ pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<f32> {
 
     // We did escape, now we need to figure out the "fractional iteration"
     // See https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
-    //
-    // TODO: There is still some "banding" visible in the outer regions,
-    // need to figure out if this math is wrong or if there is a precision
-    // issue or what.
-    let escape_time = (i as f32) - z.norm_sqr().log2().log2() + 4.0;
+    let escape_time =
+        (i as f32) - ((0.5 * z.norm_sqr().ln()) / ESCAPE_RADIUS.ln()).ln() / (2.0_f32).ln();
     Some(escape_time)
 }
 
