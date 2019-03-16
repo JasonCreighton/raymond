@@ -8,6 +8,7 @@ edition = "2018"
 rayon = "1.0.3"
 rand = "0.6.5"
 num-complex = "0.2.1"
+strided = "0.2.9"
 
 [profile.release]
 debug = true

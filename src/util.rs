@@ -1,3 +1,6 @@
+use strided;
+use strided::{MutStride, Stride};
+
 /// Fixed size two dimensional array
 pub struct Array2D<T> {
     pub rows: usize,
@@ -45,5 +48,14 @@ impl<T: Clone> Array2D<T> {
 
     pub fn iter_rows_mut(&mut self) -> impl Iterator<Item = &mut [T]> {
         self.data.chunks_exact_mut(self.columns)
+    }
+
+    // TODO: I would prefer not to expose Stride/MutStride here
+    pub fn iter_columns(&self) -> impl Iterator<Item = Stride<T>> {
+        Stride::new(&self.data).substrides(self.columns)
+    }
+
+    pub fn iter_columns_mut(&mut self) -> impl Iterator<Item = MutStride<T>> {
+        MutStride::new(&mut self.data).substrides_mut(self.columns)
     }
 }
