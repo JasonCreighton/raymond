@@ -158,7 +158,7 @@ pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 /// Performs a two dimensional convolution against the provided image and returns
 /// a new image. For a W by H image with kernel length K and decimation factor D, the
 /// output dimensions will be (W - (K - 1))/D by (H - (K - 1))/D
-pub fn convolve_2d(image: &Array2D<RGB>, kernel: &[f32], decimation_factor: i32) -> Array2D<RGB> {
+pub fn convolve_2d(image: &Array2D<RGB>, kernel: &[f32], decimation_factor: usize) -> Array2D<RGB> {
     // We convolve & transpose twice, which results in an untransposed image
     let flipped = convolve_and_transpose(image, &kernel, decimation_factor);
     convolve_and_transpose(&flipped, &kernel, decimation_factor)
@@ -172,13 +172,13 @@ pub fn convolve_2d(image: &Array2D<RGB>, kernel: &[f32], decimation_factor: i32)
 fn convolve_and_transpose(
     image: &Array2D<RGB>,
     kernel: &[f32],
-    decimation_factor: i32,
+    decimation_factor: usize,
 ) -> Array2D<RGB> {
     let input_width = image.columns;
     let input_height = image.rows;
     let kernel_length = kernel.len();
     let output_width = input_height;
-    let output_height = (input_width - (kernel_length - 1)) / (decimation_factor as usize);
+    let output_height = (input_width - (kernel_length - 1)) / decimation_factor;
     let mut output_image = Array2D::new(output_height, output_width, &RGB::BLACK);
 
     // AFAIK Rayon cannot accept arbitrary types to use as parallel iterators so we

@@ -38,7 +38,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(width: i32, height: i32, position: Vec3f, direction: Vec3f) -> Camera {
+    pub fn new(width: usize, height: usize, position: Vec3f, direction: Vec3f) -> Camera {
         // TODO: Using cross products like this to means that the camera can't point
         // straight up or straight down, because otherwise the cross with Vec3f::UP
         // yields the zero vector, and then normalizing results in NaNs.
@@ -71,7 +71,7 @@ impl Camera {
         &self.position
     }
 
-    fn ray_direction(&self, x: i32, y: i32) -> Vec3f {
+    fn ray_direction(&self, x: usize, y: usize) -> Vec3f {
         self.upper_left
             .add(&self.delta_x.scale(x as f32))
             .add(&self.delta_y.scale(y as f32))
@@ -79,8 +79,8 @@ impl Camera {
 }
 
 impl Scene {
-    pub fn trace_image(&self, camera: &Camera, width: i32, height: i32) -> Array2D<RGB> {
-        let mut image = Array2D::new(height as usize, width as usize, &RGB::BLACK);
+    pub fn trace_image(&self, camera: &Camera, width: usize, height: usize) -> Array2D<RGB> {
+        let mut image = Array2D::new(height, width, &RGB::BLACK);
 
         // Can't figure out how to get Rayon to use my iterator directly, so I
         // convert to a vec of references first.
@@ -97,14 +97,14 @@ impl Scene {
     pub fn trace_image_oversampled(
         &self,
         camera: &Camera,
-        width: i32,
-        height: i32,
-        oversampling_factor: i32,
+        width: usize,
+        height: usize,
+        oversampling_factor: usize,
     ) -> Array2D<RGB> {
         if oversampling_factor > 1 {
             let sigma = (oversampling_factor as f32) * 0.4;
             let resampling_kernel = gaussian_kernel(sigma);
-            let extra_points_needed = (resampling_kernel.len() - 1) as i32;
+            let extra_points_needed = resampling_kernel.len() - 1;
 
             let oversampled_width = (width * oversampling_factor) + extra_points_needed;
             let oversampled_height = (height * oversampling_factor) + extra_points_needed;

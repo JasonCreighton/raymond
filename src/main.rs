@@ -7,11 +7,32 @@ mod util;
 
 use rand::random;
 use std::time::Instant;
+use structopt::StructOpt;
 
 use math::*;
 use scene::*;
 use surface::*;
 use texture::*;
+
+#[derive(StructOpt)]
+#[structopt(name = "raymond")]
+struct CommandLineArguments {
+    /// Output file in PPM format (overwritten if already exists)
+    #[structopt(short = "o", long = "output", default_value = "raymond_out.ppm")]
+    output_file: String,
+
+    /// Width of output image (in pixels)
+    #[structopt(short = "w", long = "width", default_value = "1024")]
+    width: usize,
+
+    /// Height of output image (in pixels)
+    #[structopt(short = "h", long = "height", default_value = "768")]
+    height: usize,
+
+    /// Oversampling factor (ie, antialiasing)
+    #[structopt(short = "s", long = "samples", default_value = "2")]
+    oversampling_factor: usize,
+}
 
 fn random_sphere() -> VisObj {
     VisObj {
@@ -118,16 +139,14 @@ fn build_scene() -> Scene {
 }
 
 fn main() {
-    let oversampling_factor = 2;
-    let width = 1024;
-    let height = 768;
+    let args = CommandLineArguments::from_args();
 
     let scene = build_scene();
     // TODO: It's awkward to have to tell both the Camera and trace_image_oversampled()
     // about the oversampling factor
     let camera = Camera::new(
-        width * oversampling_factor,
-        height * oversampling_factor,
+        args.width * args.oversampling_factor,
+        args.height * args.oversampling_factor,
         Vec3f {
             x: -11.0,
             y: 0.0,
@@ -141,12 +160,13 @@ fn main() {
     );
 
     let trace_start = Instant::now();
-    let image = scene.trace_image_oversampled(&camera, width, height, oversampling_factor);
+    let image =
+        scene.trace_image_oversampled(&camera, args.width, args.height, args.oversampling_factor);
     println!("Traced image in {} ms.", trace_start.elapsed().as_millis());
 
     let write_start = Instant::now();
     let mut ppm_out =
-        ppm::PPMWriter::new("test.ppm", image.columns as i32, image.rows as i32).unwrap();
+        ppm::PPMWriter::new(&args.output_file, image.columns as i32, image.rows as i32).unwrap();
 
     for scanline in image.iter_rows() {
         for pixel in scanline {
