@@ -1,2 +1,3 @@
-# raymond
-Simple ray tracer written in Rust
+# Raymond
+
+Simple ray tracer written in Rust as a learning exercise.
