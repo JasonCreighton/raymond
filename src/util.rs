@@ -10,6 +10,7 @@ pub struct Array2D<T> {
 
 #[allow(dead_code)]
 impl<T: Clone> Array2D<T> {
+    /// Construct a "rows" by "columns" two dimensional array, filled with "fill_element"
     pub fn new(rows: usize, columns: usize, fill_element: &T) -> Array2D<T> {
         let data = vec![fill_element.clone(); rows * columns];
         Array2D {
@@ -19,6 +20,7 @@ impl<T: Clone> Array2D<T> {
         }
     }
 
+    /// Get a reference to the element at the given (zero-indexed) row and column
     pub fn get(&self, row: usize, column: usize) -> &T {
         debug_assert!(row < self.rows);
         debug_assert!(column < self.columns);
@@ -26,20 +28,12 @@ impl<T: Clone> Array2D<T> {
         &self.data[(row * self.columns) + column]
     }
 
+    /// Set the element at the given (zero-indxed) row and column to a clone of the passed "val"
     pub fn set(&mut self, row: usize, column: usize, val: &T) {
         debug_assert!(row < self.rows);
         debug_assert!(column < self.columns);
 
         self.data[(row * self.columns) + column] = val.clone();
-    }
-
-    pub fn slice_within_row(&self, row: usize, column_range: std::ops::Range<usize>) -> &[T] {
-        debug_assert!(row < self.rows);
-        debug_assert!(column_range.start < self.columns);
-        debug_assert!(column_range.end <= self.columns);
-
-        let offset = row * self.columns;
-        &self.data[(offset + column_range.start)..(offset + column_range.end)]
     }
 
     pub fn iter_rows(&self) -> impl Iterator<Item = &[T]> {
@@ -50,7 +44,8 @@ impl<T: Clone> Array2D<T> {
         self.data.chunks_exact_mut(self.columns)
     }
 
-    // TODO: I would prefer not to expose Stride/MutStride here
+    // TODO: I would prefer not to expose Stride/MutStride here, it would be nice
+    // if the iter_rows() and iter_columns() functions had the same type signature
     pub fn iter_columns(&self) -> impl Iterator<Item = Stride<T>> {
         Stride::new(&self.data).substrides(self.columns)
     }
