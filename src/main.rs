@@ -142,8 +142,6 @@ fn main() {
     let args = CommandLineArguments::from_args();
 
     let scene = build_scene();
-    // TODO: It's awkward to have to tell both the Camera and trace_image_oversampled()
-    // about the oversampling factor
     let camera = Camera::new(
         Vec3f {
             x: -11.0,
