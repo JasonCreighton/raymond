@@ -32,36 +32,33 @@ pub struct Scene {
 #[derive(Debug)]
 pub struct Camera {
     position: Vec3f,
-    upper_left: Vec3f,
+    direction: Vec3f,
     delta_x: Vec3f,
     delta_y: Vec3f,
 }
 
 impl Camera {
-    pub fn new(width: usize, height: usize, position: Vec3f, direction: Vec3f) -> Camera {
+    pub fn new(position: Vec3f, direction: Vec3f, fov_degrees: f32) -> Camera {
         // TODO: Using cross products like this to means that the camera can't point
         // straight up or straight down, because otherwise the cross with Vec3f::UP
         // yields the zero vector, and then normalizing results in NaNs.
-        let zoom = 2.0;
+        
+        let fov_radians = fov_degrees * ((2.0 * std::f32::consts::PI) / 360.0);       
+        let fov_scale = (fov_radians / 2.0).tan();
+        
         let delta_x = direction
             .cross(&Vec3f::UP)
             .normalize()
-            .scale(1.0 / (width as f32));
-        // NB: delta_y is scaled relative to width as well, to make sure we get square
-        // pixels
+            .scale(fov_scale);
+            
         let delta_y = direction
             .cross(&delta_x)
             .normalize()
-            .scale(1.0 / (width as f32));
-        let upper_left = direction
-            .normalize()
-            .scale(zoom as f32)
-            .add(&delta_x.scale(-(width as f32) / 2.0))
-            .add(&delta_y.scale(-(height as f32) / 2.0));
+            .scale(fov_scale);
 
         Camera {
             position,
-            upper_left,
+            direction: direction.normalize(),
             delta_x,
             delta_y,
         }
@@ -71,23 +68,30 @@ impl Camera {
         &self.position
     }
 
-    fn ray_direction(&self, x: usize, y: usize) -> Vec3f {
-        self.upper_left
-            .add(&self.delta_x.scale(x as f32))
-            .add(&self.delta_y.scale(y as f32))
+    fn ray_direction(&self, x: f32, y: f32) -> Vec3f {        
+        self.direction
+            .add(&self.delta_x.scale(x))
+            .add(&self.delta_y.scale(y))
     }
 }
 
 impl Scene {
     pub fn trace_image(&self, camera: &Camera, width: usize, height: usize) -> Array2D<RGB> {
-        let mut image = Array2D::new(height, width, &RGB::BLACK);
+        let mut image = Array2D::new(height, width, &RGB::BLACK);   
+        
+        let largest_dimension = width.max(height) as f32;
+        let x_offset = (width as f32) / 2.0;
+        let y_offset = (height as f32) / 2.0;
+        let camera_scale = 2.0 / largest_dimension;
 
         // Can't figure out how to get Rayon to use my iterator directly, so I
         // convert to a vec of references first.
         let mut tmp: Vec<&mut [RGB]> = image.iter_rows_mut().collect();
         tmp.par_iter_mut().zip(0..height).for_each(|(row, y)| {
             row.iter_mut().zip(0..width).for_each(|(pixel, x)| {
-                *pixel = self.cast(&camera.ray_origin(), &camera.ray_direction(x, y), 10);
+                let camera_x = ((x as f32) - x_offset) * camera_scale;
+                let camera_y = ((y as f32) - y_offset) * camera_scale;
+                *pixel = self.cast(&camera.ray_origin(), &camera.ray_direction(camera_x, camera_y), 10);
             })
         });
 

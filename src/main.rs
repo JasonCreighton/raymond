@@ -145,8 +145,6 @@ fn main() {
     // TODO: It's awkward to have to tell both the Camera and trace_image_oversampled()
     // about the oversampling factor
     let camera = Camera::new(
-        args.width * args.oversampling_factor,
-        args.height * args.oversampling_factor,
         Vec3f {
             x: -11.0,
             y: 0.0,
@@ -157,6 +155,7 @@ fn main() {
             y: 0.0,
             z: -1.0,
         },
+        45.0,
     );
 
     let trace_start = Instant::now();
