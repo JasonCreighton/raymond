@@ -39,6 +39,13 @@ pub struct Plane {
     normal: Vec3f,
 }
 
+/// Quadrilateral. (like a Plane, but finite in extent)
+pub struct Quad {
+    plane: Plane,
+    width: f32,
+    height: f32,
+}
+
 impl Sphere {
     pub fn new(center: &Vec3f, radius: f32) -> Sphere {
         Sphere {
@@ -121,5 +128,34 @@ impl Surface for Plane {
             u,
             v,
         }
+    }
+}
+
+impl Quad {
+    pub fn new(plane: Plane, width: f32, height: f32) -> Quad {
+        Quad {
+            plane,
+            width,
+            height,
+        }
+    }
+}
+
+impl Surface for Quad {
+    fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32> {
+        // We have to intersect with the plane but also fall within the limits of the Quad
+        self.plane
+            .intersection_with_ray(ray_origin, ray_direction)
+            .filter(|d| {
+                let point = ray_origin.add(&ray_direction.scale(*d));
+                let surf_prop = self.plane.at_point(&point);
+
+                (surf_prop.u >= 0.0 && surf_prop.u < self.width)
+                    && (surf_prop.v >= 0.0 && surf_prop.v <= self.height)
+            })
+    }
+
+    fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
+        self.plane.at_point(point_on_surface)
     }
 }
