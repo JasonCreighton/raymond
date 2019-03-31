@@ -70,10 +70,44 @@ fn build_scene() -> Scene {
     scene.light_sources.push(LightSource {
         dir_to_light: Vec3f {
             x: 0.0,
-            y: 10.0,
+            y: -10.0,
             z: 10.0,
         },
         intensity: 5.0,
+    });
+
+    // Classic red and white infinite checkerboard
+    scene.objects.push(VisObj {
+        surface: Box::new(Plane::new(
+            &Vec3f {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            &Vec3f {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            &Vec3f {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+        )),
+        texture: Box::new(Checkerboard::new(
+            Box::new(RGB {
+                red: 0.2,
+                green: 0.2,
+                blue: 0.2,
+            }),
+            Box::new(RGB {
+                red: 0.6,
+                green: 0.0,
+                blue: 0.0,
+            }),
+        )),
+        reflectivity: 0.0,
     });
 
     let mut colormap = Vec::new();
@@ -108,32 +142,51 @@ fn build_scene() -> Scene {
         blue: 0.0,
     });
 
-    // Infinite plane of the Mandelbrot Set
+    // Rectangle showing the Mandelbrot set
     scene.objects.push(VisObj {
-        surface: Box::new(Plane::new(
-            &Vec3f {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            &Vec3f {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            &Vec3f {
-                x: 0.0,
-                y: 1.0,
-                z: 0.0,
-            },
+        surface: Box::new(Quad::new(
+            Plane::new(
+                &Vec3f {
+                    x: -1.0,
+                    y: 2.0,
+                    z: 1.0,
+                },
+                &Vec3f {
+                    x: 1.0,
+                    y: -1.0,
+                    z: 0.0,
+                }
+                .normalize(),
+                &Vec3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.0,
+                },
+            ),
+            3.0,
+            2.5,
         )),
-        texture: Box::new(MandelbrotSet { colormap }),
+        texture: Box::new(CoordinateTransform {
+            texture: Box::new(MandelbrotSet { colormap }),
+            u_offset: -2.0,
+            v_offset: -1.25,
+            scale: 1.0,
+        }),
         reflectivity: 0.0,
     });
 
-    for _ in 0..10 {
-        scene.objects.push(random_sphere());
-    }
+    scene.objects.push(VisObj {
+        surface: Box::new(Sphere::new(
+            &Vec3f {
+                x: 0.0,
+                y: -2.0,
+                z: 2.25,
+            },
+            1.0,
+        )),
+        texture: Box::new(RGB::BLACK),
+        reflectivity: 0.9,
+    });
 
     scene
 }
