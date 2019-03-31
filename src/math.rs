@@ -94,11 +94,11 @@ impl RGB {
     }
 
     pub fn linear_to_srgb(&self) -> RGB {
-        self.map(|x| x.powf(1.0 / 2.2))
+        self.map(|x| x.max(0.0).min(1.0).powf(1.0 / 2.2))
     }
 
     pub fn srgb_to_linear(&self) -> RGB {
-        self.map(|x| x.powf(2.2))
+        self.map(|x| x.max(0.0).min(1.0).powf(2.2))
     }
 
     // TODO: Very similar to Vec3f functionality, and one could imagine use for other
