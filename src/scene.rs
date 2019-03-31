@@ -42,19 +42,13 @@ impl Camera {
         // TODO: Using cross products like this to means that the camera can't point
         // straight up or straight down, because otherwise the cross with Vec3f::UP
         // yields the zero vector, and then normalizing results in NaNs.
-        
-        let fov_radians = fov_degrees * ((2.0 * std::f32::consts::PI) / 360.0);       
+
+        let fov_radians = fov_degrees * ((2.0 * std::f32::consts::PI) / 360.0);
         let fov_scale = (fov_radians / 2.0).tan();
-        
-        let delta_x = direction
-            .cross(&Vec3f::UP)
-            .normalize()
-            .scale(fov_scale);
-            
-        let delta_y = direction
-            .cross(&delta_x)
-            .normalize()
-            .scale(fov_scale);
+
+        let delta_x = direction.cross(&Vec3f::UP).normalize().scale(fov_scale);
+
+        let delta_y = direction.cross(&delta_x).normalize().scale(fov_scale);
 
         Camera {
             position,
@@ -68,7 +62,7 @@ impl Camera {
         &self.position
     }
 
-    fn ray_direction(&self, x: f32, y: f32) -> Vec3f {        
+    fn ray_direction(&self, x: f32, y: f32) -> Vec3f {
         self.direction
             .add(&self.delta_x.scale(x))
             .add(&self.delta_y.scale(y))
@@ -77,8 +71,8 @@ impl Camera {
 
 impl Scene {
     pub fn trace_image(&self, camera: &Camera, width: usize, height: usize) -> Array2D<RGB> {
-        let mut image = Array2D::new(height, width, &RGB::BLACK);   
-        
+        let mut image = Array2D::new(height, width, &RGB::BLACK);
+
         let largest_dimension = width.max(height) as f32;
         let x_offset = (width as f32) / 2.0;
         let y_offset = (height as f32) / 2.0;
@@ -91,7 +85,11 @@ impl Scene {
             row.iter_mut().zip(0..width).for_each(|(pixel, x)| {
                 let camera_x = ((x as f32) - x_offset) * camera_scale;
                 let camera_y = ((y as f32) - y_offset) * camera_scale;
-                *pixel = self.cast(&camera.ray_origin(), &camera.ray_direction(camera_x, camera_y), 10);
+                *pixel = self.cast(
+                    &camera.ray_origin(),
+                    &camera.ray_direction(camera_x, camera_y),
+                    10,
+                );
             })
         });
 
