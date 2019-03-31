@@ -11,7 +11,14 @@ pub trait Texture: Sync {
 pub struct Checkerboard {
     texture1: Box<dyn Texture>,
     texture2: Box<dyn Texture>,
-    square_size: f32,
+}
+
+/// Offsets and scales the (u, v) coordinates of another Texture
+pub struct CoordinateTransform {
+    pub texture: Box<dyn Texture>,
+    pub u_offset: f32,
+    pub v_offset: f32,
+    pub scale: f32,
 }
 
 /// Texture representing the Mandelbrot set
@@ -27,26 +34,16 @@ impl Texture for RGB {
 }
 
 impl Checkerboard {
-    pub fn new(
-        texture1: Box<dyn Texture>,
-        texture2: Box<dyn Texture>,
-        square_size: f32,
-    ) -> Checkerboard {
-        Checkerboard {
-            texture1,
-            texture2,
-            square_size,
-        }
+    pub fn new(texture1: Box<dyn Texture>, texture2: Box<dyn Texture>) -> Checkerboard {
+        Checkerboard { texture1, texture2 }
     }
 }
 
 impl Texture for Checkerboard {
     fn color(&self, u: f32, v: f32) -> RGB {
-        let scaled_u = u / self.square_size;
-        let scaled_v = v / self.square_size;
-        let square_number = (scaled_u.floor() + scaled_v.floor()) as i32;
-        let square_u = scaled_u - u.floor();
-        let square_v = scaled_v - v.floor();
+        let square_number = (u.floor() + v.floor()) as i32;
+        let square_u = u - u.floor();
+        let square_v = v - v.floor();
 
         match (square_number + 1_000_000) % 2 {
             0 => self.texture1.color(square_u, square_v),
@@ -56,9 +53,18 @@ impl Texture for Checkerboard {
     }
 }
 
+impl Texture for CoordinateTransform {
+    fn color(&self, u: f32, v: f32) -> RGB {
+        let u2 = self.u_offset + (u * self.scale);
+        let v2 = self.v_offset + (v * self.scale);
+
+        self.texture.color(u2, v2)
+    }
+}
+
 impl Texture for MandelbrotSet {
     fn color(&self, u: f32, v: f32) -> RGB {
-        let escape_time = mandelbrot_escape_time(Complex::new(u * 0.5, v * 0.5));
+        let escape_time = mandelbrot_escape_time(Complex::new(u, v));
         match escape_time {
             Some(t) => {
                 let index = t * 0.25;
