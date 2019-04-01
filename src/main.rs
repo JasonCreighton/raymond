@@ -98,9 +98,9 @@ fn build_scene(camera: &Camera) -> Scene {
         )),
         texture: Box::new(Checkerboard::new(
             Box::new(RGB {
-                red: 2.5/3.0,
-                green: 2.5/3.0,
-                blue: 2.5/3.0,
+                red: 2.5 / 3.0,
+                green: 2.5 / 3.0,
+                blue: 2.5 / 3.0,
             }),
             Box::new(RGB {
                 red: 2.5,
