@@ -56,13 +56,14 @@ fn random_sphere() -> VisObj {
     }
 }
 
-fn build_scene() -> Scene {
+fn build_scene(camera: &Camera) -> Scene {
     let mut scene = Scene {
         background: RGB {
             red: 0.3,
             green: 0.5,
             blue: 0.9,
         },
+        ambient_light_intensity: 0.25,
         light_sources: Vec::new(),
         objects: Vec::new(),
     };
@@ -73,7 +74,7 @@ fn build_scene() -> Scene {
             y: -10.0,
             z: 10.0,
         },
-        intensity: 5.0,
+        intensity: 0.75,
     });
 
     // Classic red and white infinite checkerboard
@@ -97,12 +98,12 @@ fn build_scene() -> Scene {
         )),
         texture: Box::new(Checkerboard::new(
             Box::new(RGB {
-                red: 0.2,
-                green: 0.2,
-                blue: 0.2,
+                red: 2.5/3.0,
+                green: 2.5/3.0,
+                blue: 2.5/3.0,
             }),
             Box::new(RGB {
-                red: 0.6,
+                red: 2.5,
                 green: 0.0,
                 blue: 0.0,
             }),
@@ -114,30 +115,30 @@ fn build_scene() -> Scene {
     colormap.push(RGB {
         red: 0.0,
         green: 0.0,
-        blue: 0.25,
-    });
-    colormap.push(RGB {
-        red: 0.0,
-        green: 0.0,
         blue: 0.5,
     });
     colormap.push(RGB {
         red: 0.0,
-        green: 0.5,
-        blue: 0.5,
+        green: 0.0,
+        blue: 1.0,
     });
     colormap.push(RGB {
-        red: 0.5,
-        green: 0.5,
+        red: 0.0,
+        green: 1.0,
+        blue: 1.0,
+    });
+    colormap.push(RGB {
+        red: 1.0,
+        green: 1.0,
         blue: 0.0,
     });
     colormap.push(RGB {
-        red: 0.5,
+        red: 1.0,
         green: 0.0,
         blue: 0.0,
     });
     colormap.push(RGB {
-        red: 0.25,
+        red: 0.5,
         green: 0.0,
         blue: 0.0,
     });
@@ -148,7 +149,7 @@ fn build_scene() -> Scene {
             Plane::new(
                 &Vec3f {
                     x: -1.0,
-                    y: 2.0,
+                    y: 4.0,
                     z: 1.0,
                 },
                 &Vec3f {
@@ -170,19 +171,57 @@ fn build_scene() -> Scene {
             texture: Box::new(MandelbrotSet { colormap }),
             u_offset: -2.0,
             v_offset: -1.25,
-            scale: 1.0,
+            u_scale: 1.0,
+            v_scale: 1.0,
         }),
         reflectivity: 0.0,
     });
 
+    // Rectangle recursively showing the same scene
+    scene.objects.push(VisObj {
+        surface: Box::new(Quad::new(
+            Plane::new(
+                &Vec3f {
+                    x: -1.0,
+                    y: -4.0,
+                    z: 1.0,
+                },
+                &Vec3f {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.0,
+                }
+                .normalize(),
+                &Vec3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.0,
+                },
+            ),
+            3.0,
+            2.5,
+        )),
+        texture: Box::new(CoordinateTransform {
+            texture: Box::new(Portal {
+                camera: camera.clone(),
+            }),
+            u_offset: -1.5,
+            v_offset: -1.25,
+            u_scale: -1.0 / 1.5,
+            v_scale: -1.0,
+        }),
+        reflectivity: 0.0,
+    });
+
+    // Nice reflective sphere
     scene.objects.push(VisObj {
         surface: Box::new(Sphere::new(
             &Vec3f {
                 x: 0.0,
-                y: -2.0,
+                y: 0.0,
                 z: 2.25,
             },
-            1.0,
+            1.5,
         )),
         texture: Box::new(RGB::BLACK),
         reflectivity: 0.9,
@@ -194,7 +233,6 @@ fn build_scene() -> Scene {
 fn main() {
     let args = CommandLineArguments::from_args();
 
-    let scene = build_scene();
     let camera = Camera::new(
         Vec3f {
             x: -11.0,
@@ -208,6 +246,7 @@ fn main() {
         },
         45.0,
     );
+    let scene = build_scene(&camera);
 
     let trace_start = Instant::now();
     let image =

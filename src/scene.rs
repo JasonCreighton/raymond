@@ -2,7 +2,7 @@ use rayon::prelude::*;
 
 use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, RGB};
 use crate::surface::Surface;
-use crate::texture::Texture;
+use crate::texture::{Texture, TextureColor};
 use crate::util::Array2D;
 
 // If we try to trace from the exact position on a surface, sometimes we will
@@ -25,11 +25,12 @@ pub struct VisObj {
 
 pub struct Scene {
     pub background: RGB,
+    pub ambient_light_intensity: f32,
     pub light_sources: Vec<LightSource>,
     pub objects: Vec<VisObj>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Camera {
     position: Vec3f,
     direction: Vec3f,
@@ -58,11 +59,11 @@ impl Camera {
         }
     }
 
-    fn ray_origin(&self) -> &Vec3f {
+    pub fn ray_origin(&self) -> &Vec3f {
         &self.position
     }
 
-    fn ray_direction(&self, x: f32, y: f32) -> Vec3f {
+    pub fn ray_direction(&self, x: f32, y: f32) -> Vec3f {
         self.direction
             .add(&self.delta_x.scale(x))
             .add(&self.delta_y.scale(y))
@@ -136,7 +137,6 @@ impl Scene {
     }
 
     fn light_on_surface(&self, surface_position: &Vec3f, surface_normal: &Vec3f) -> f32 {
-        let ambient_light_intensity = 1.0;
         let trace_pos = surface_position.add(&surface_normal.scale(FLOAT_BIAS));
 
         let lambert_light_intensity: f32 = self
@@ -158,7 +158,7 @@ impl Scene {
             })
             .sum();
 
-        ambient_light_intensity + lambert_light_intensity
+        self.ambient_light_intensity + lambert_light_intensity
     }
 
     fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> RGB {
@@ -171,7 +171,13 @@ impl Scene {
                 let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
                 let surf_prop = vobj.surface.at_point(&intersection_pos);
                 let light_intensity = self.light_on_surface(&intersection_pos, &surf_prop.normal);
-                let vobj_color = vobj.texture.color(surf_prop.u, surf_prop.v);
+                let texture_color = vobj.texture.color(surf_prop.u, surf_prop.v);
+                let vobj_color = match texture_color {
+                    TextureColor::PlainColor(c) => c,
+                    TextureColor::CastRay { origin, direction } => {
+                        self.cast(&origin, &direction, max_depth - 1)
+                    }
+                };
 
                 let reflected_color = if vobj.reflectivity != 0.0 {
                     let reflect_ray = angle_of_reflection(&ray_direction, &surf_prop.normal);
