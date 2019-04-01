@@ -2,7 +2,7 @@ use rayon::prelude::*;
 
 use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, RGB};
 use crate::surface::Surface;
-use crate::texture::{Texture, TextureColor};
+use crate::texture::Texture;
 use crate::util::Array2D;
 
 // If we try to trace from the exact position on a surface, sometimes we will
@@ -161,7 +161,7 @@ impl Scene {
         self.ambient_light_intensity + lambert_light_intensity
     }
 
-    fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> RGB {
+    pub fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> RGB {
         if max_depth == 0 {
             return self.background;
         }
@@ -171,13 +171,9 @@ impl Scene {
                 let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
                 let surf_prop = vobj.surface.at_point(&intersection_pos);
                 let light_intensity = self.light_on_surface(&intersection_pos, &surf_prop.normal);
-                let texture_color = vobj.texture.color(surf_prop.u, surf_prop.v);
-                let vobj_color = match texture_color {
-                    TextureColor::PlainColor(c) => c,
-                    TextureColor::CastRay { origin, direction } => {
-                        self.cast(&origin, &direction, max_depth - 1)
-                    }
-                };
+                let vobj_color = vobj
+                    .texture
+                    .color(&self, max_depth, surf_prop.u, surf_prop.v);
 
                 let reflected_color = if vobj.reflectivity != 0.0 {
                     let reflect_ray = angle_of_reflection(&ray_direction, &surf_prop.normal);
