@@ -79,8 +79,8 @@ impl Surface for Sphere {
     fn at_point(&self, point_on_surface: &Vec3f) -> SurfaceProperties {
         let d = point_on_surface.sub(&self.center).normalize();
         let normal = point_on_surface.sub(&self.center).normalize();
-        let u = 0.5 + d.y.atan2(d.x) / (2.0 * std::f32::consts::PI);
-        let v = 0.5 - d.z.asin() / std::f32::consts::PI;
+        let u = 0.5 + d.y.atan2(d.x) * (1.0 / (2.0 * std::f32::consts::PI));
+        let v = 0.5 - d.z.asin() * (1.0 / std::f32::consts::PI);
 
         SurfaceProperties { normal, u, v }
     }
