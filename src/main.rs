@@ -34,6 +34,7 @@ struct CommandLineArguments {
     oversampling_factor: usize,
 }
 
+#[allow(dead_code)]
 fn random_sphere() -> VisObj {
     VisObj {
         surface: Box::new(Sphere::new(

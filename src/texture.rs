@@ -1,6 +1,6 @@
 use num_complex::Complex;
 
-use crate::math::{linear_interpolation, mandelbrot_escape_time, Vec3f, RGB};
+use crate::math::{linear_interpolation, mandelbrot_escape_time, RGB};
 use crate::scene::{Camera, Scene};
 
 /// A Texture maps a (u, v) coordinate on a Surface into a color
