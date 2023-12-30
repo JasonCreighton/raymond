@@ -6,32 +6,85 @@ mod texture;
 mod util;
 
 use rand::random;
+use std::env;
+use std::process::ExitCode;
 use std::time::Instant;
-use structopt::StructOpt;
 
 use math::*;
 use scene::*;
 use surface::*;
 use texture::*;
 
-#[derive(StructOpt)]
-#[structopt(name = "raymond")]
 struct CommandLineArguments {
-    /// Output file in PPM format (overwritten if already exists)
-    #[structopt(short = "o", long = "output", default_value = "raymond_out.ppm")]
     output_file: String,
-
-    /// Width of output image (in pixels)
-    #[structopt(short = "w", long = "width", default_value = "1024")]
     width: usize,
-
-    /// Height of output image (in pixels)
-    #[structopt(short = "h", long = "height", default_value = "768")]
     height: usize,
-
-    /// Oversampling factor (ie, antialiasing)
-    #[structopt(short = "s", long = "samples", default_value = "2")]
     oversampling_factor: usize,
+}
+
+type FlagNames = (&'static str, &'static str);
+impl CommandLineArguments {
+    const FLAG_OUTPUT: FlagNames = ("-o", "--output");
+    const FLAG_WIDTH: FlagNames = ("-w", "--width");
+    const FLAG_HEIGHT: FlagNames = ("-h", "--height");
+    const FLAG_SAMPLES: FlagNames = ("-s", "--samples");
+
+    fn default() -> CommandLineArguments {
+        CommandLineArguments {
+            output_file: String::from("raymond_out.ppm"),
+            width: 1024,
+            height: 768,
+            oversampling_factor: 2,
+        }
+    }
+
+    fn show_usage() {
+        fn flag_usage(f: FlagNames, desc: &str) {
+            eprintln!("    {}, {:20} {}", f.0, f.1, desc);
+        }
+
+        eprintln!("Usage: raymond [options]");
+        eprintln!("");
+        flag_usage(Self::FLAG_OUTPUT, "Output file in PPM format (overwritten if already exists)");
+        flag_usage(Self::FLAG_WIDTH, "Width of output image (in pixels)");
+        flag_usage(Self::FLAG_HEIGHT, "Height of output image (in pixels)");
+        flag_usage(Self::FLAG_SAMPLES, "Oversampling factor (ie, antialiasing)");
+    }
+
+    fn from_args() -> Result<CommandLineArguments, String> {
+        fn is_flag(s: &str, flag: FlagNames) -> bool {
+            s == flag.0 || s == flag.1
+        }
+
+        let mut raw_args: Vec<String> = env::args().collect();
+        let mut args = Self::default();
+
+        raw_args.reverse();
+        raw_args.pop(); // skip program name
+
+        while let Some(flag) = raw_args.pop() {
+            let arg = match raw_args.pop() {
+                Some(arg) => arg,
+                None => return Err(String::from("Value expected after command line argument")),
+            };
+
+            if is_flag(&flag, Self::FLAG_OUTPUT) {
+                args.output_file = arg;
+            } else if is_flag(&flag, Self::FLAG_WIDTH) {
+                args.width = arg.parse().map_err(|_| "Could not parse width")?;
+            } else if is_flag(&flag, Self::FLAG_HEIGHT) {
+                args.height = arg.parse().map_err(|_| "Could not parse height")?;
+            } else if is_flag(&flag, Self::FLAG_SAMPLES) {
+                args.oversampling_factor = arg
+                    .parse()
+                    .map_err(|_| "Could not parse oversampling factor")?;
+            } else {
+                return Err(String::from("Unexpected command line argument"));
+            }
+        }
+
+        Ok(args)
+    }
 }
 
 #[allow(dead_code)]
@@ -231,8 +284,16 @@ fn build_scene(camera: &Camera) -> Scene {
     scene
 }
 
-fn main() {
-    let args = CommandLineArguments::from_args();
+fn main() -> ExitCode {
+    let args = match CommandLineArguments::from_args() {
+        Ok(args) => args,
+        Err(msg) => {
+            eprintln!("Error processing command line arguments: {}", msg);
+            eprintln!("");
+            CommandLineArguments::show_usage();
+            return ExitCode::FAILURE;
+        }
+    };
 
     let camera = Camera::new(
         Vec3f {
@@ -265,4 +326,6 @@ fn main() {
         }
     }
     println!("Wrote output in {} ms.", write_start.elapsed().as_millis());
+
+    ExitCode::SUCCESS
 }
