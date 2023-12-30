@@ -5,7 +5,6 @@ mod surface;
 mod texture;
 mod util;
 
-use rand::random;
 use std::env;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -45,7 +44,10 @@ impl CommandLineArguments {
 
         eprintln!("Usage: raymond [options]");
         eprintln!("");
-        flag_usage(Self::FLAG_OUTPUT, "Output file in PPM format (overwritten if already exists)");
+        flag_usage(
+            Self::FLAG_OUTPUT,
+            "Output file in PPM format (overwritten if already exists)",
+        );
         flag_usage(Self::FLAG_WIDTH, "Width of output image (in pixels)");
         flag_usage(Self::FLAG_HEIGHT, "Height of output image (in pixels)");
         flag_usage(Self::FLAG_SAMPLES, "Oversampling factor (ie, antialiasing)");
@@ -92,19 +94,16 @@ fn random_sphere() -> VisObj {
     VisObj {
         surface: Box::new(Sphere::new(
             &Vec3f {
-                x: random::<f32>() * 10.0,
-                y: random::<f32>() * 10.0 - 5.0,
-                z: random::<f32>() * 5.0,
+                x: util::rand_f32() * 10.0,
+                y: util::rand_f32() * 10.0 - 5.0,
+                z: util::rand_f32() * 5.0,
             },
             1.0,
         )),
         texture: Box::new(RGB {
-            red: 0.0,
-            green: 0.0,
-            blue: 0.0,
-            //red: random::<f32>(),
-            //green: random::<f32>(),
-            //blue: random::<f32>(),
+            red: util::rand_f32(),
+            green: util::rand_f32(),
+            blue: util::rand_f32(),
         }),
         reflectivity: 0.9,
     }

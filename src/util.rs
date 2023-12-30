@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use strided;
 use strided::{MutStride, Stride};
 
@@ -53,4 +54,41 @@ impl<T: Clone> Array2D<T> {
     pub fn iter_columns_mut(&mut self) -> impl Iterator<Item = MutStride<T>> {
         MutStride::new(&mut self.data).substrides_mut(self.columns)
     }
+}
+
+thread_local! {
+    static PRNG_STATE: Cell<u64> = const { Cell::new(1) };
+}
+
+/// Returns a uniformly distributed pseudorandom u32
+pub fn rand_u32() -> u32 {
+    PRNG_STATE.with(|state| {
+        // This is what musl does, hopefully it's not too bad
+        let new_state = state
+            .get()
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
+        state.set(new_state);
+
+        (new_state >> 32) as u32
+    })
+}
+
+/// Returns a uniformly distributed pseudorandom u64
+pub fn rand_u64() -> u64 {
+    (rand_u32() as u64) | ((rand_u32() as u64) << 32)
+}
+
+/// Returns a pseudorandom f32 in the range [0, 1.0) with a uniform
+/// distribution.
+///
+/// Due to a simple implementation, not all f32 bit patterns in that range
+/// will be produced, and 1.0 will be generated occasionally.
+pub fn rand_f32() -> f32 {
+    let scale_factor: f32 = 1.0 / ((1u64 << 63) as f32);
+
+    // x86 (and maybe others) only has efficient int -> float functions for
+    // signed ints, so we convert to a non-negative signed int before
+    // converting to float.
+    (((rand_u64() >> 1) as i64) as f32) * scale_factor
 }
