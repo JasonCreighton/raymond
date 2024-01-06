@@ -1,7 +1,6 @@
 use num_complex::Complex;
-use rayon::prelude::*;
 
-use crate::util::Array2D;
+use crate::util::{run_parallel_jobs, Array2D};
 
 /// 3-D vector or position
 #[derive(Debug, Copy, Clone)]
@@ -181,27 +180,27 @@ fn convolve_and_transpose(
     let output_height = (input_width - (kernel_length - 1)) / decimation_factor;
     let mut output_image = Array2D::new(output_height, output_width, &RGB::BLACK);
 
-    // AFAIK Rayon cannot accept arbitrary types to use as parallel iterators so we
-    // gather the output columns and input rows into vectors before we can make use
-    // of parallel iterators.
-    let mut tmp_output_columns: Vec<_> = output_image.iter_columns_mut().collect();
-    let tmp_input_rows: Vec<_> = image.iter_rows().collect();
-
-    // Blur the rows of the input image into the columns of the output image, processing
-    // each input row in parallel if possible.
-    tmp_output_columns
-        .par_iter_mut()
-        .zip(tmp_input_rows)
-        .for_each(|(out_column, in_row)| {
-            for (out_pixel, out_y) in out_column.iter_mut().zip(0..output_height) {
-                let in_x = out_y * (decimation_factor as usize);
-                *out_pixel = in_row[in_x..(in_x + kernel_length)]
-                    .iter()
-                    .zip(kernel)
-                    .map(|(color, coef)| color.scale(*coef))
-                    .fold(RGB::BLACK, |acc, color| acc.add(&color));
+    // Create jobs that blur the rows of the input image into the columns of
+    // the output image.
+    let jobs: Vec<_> = output_image
+        .iter_columns_mut()
+        .zip(image.iter_rows())
+        .map(|(mut out_column, in_row)| {
+            move || {
+                for (out_pixel, out_y) in out_column.iter_mut().zip(0..output_height) {
+                    let in_x = out_y * (decimation_factor as usize);
+                    *out_pixel = in_row[in_x..(in_x + kernel_length)]
+                        .iter()
+                        .zip(kernel)
+                        .map(|(color, coef)| color.scale(*coef))
+                        .fold(RGB::BLACK, |acc, color| acc.add(&color));
+                }
             }
-        });
+        })
+        .collect();
+
+    // Run jobs
+    run_parallel_jobs(jobs);
 
     output_image
 }

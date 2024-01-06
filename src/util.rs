@@ -1,4 +1,6 @@
 use std::cell::Cell;
+use std::sync::Mutex;
+use std::thread;
 use strided;
 use strided::{MutStride, Stride};
 
@@ -54,6 +56,36 @@ impl<T: Clone> Array2D<T> {
     pub fn iter_columns_mut(&mut self) -> impl Iterator<Item = MutStride<T>> {
         MutStride::new(&mut self.data).substrides_mut(self.columns)
     }
+}
+
+/// Concurrency helper that spawns some worker threads and executes the given
+/// closures in parallel.
+pub fn run_parallel_jobs<J>(jobs: Vec<J>)
+where
+    J: FnOnce() -> () + Send,
+{
+    let job_queue: Mutex<Vec<J>> = Mutex::new(jobs);
+    let num_cpus: usize = std::thread::available_parallelism().unwrap().into();
+
+    thread::scope(|s| {
+        // Spawn num_cpus worker threads
+        for _ in 0..num_cpus {
+            s.spawn(|| {
+                loop {
+                    // Pull a job from the queue
+                    let mut vec_guard = job_queue.lock().unwrap();
+                    let option_job = vec_guard.pop();
+                    drop(vec_guard); // release mutex
+
+                    // Execute it, or if the queue was empty, exit the thread
+                    match option_job {
+                        Some(job) => job(),
+                        None => break,
+                    }
+                }
+            });
+        }
+    });
 }
 
 thread_local! {

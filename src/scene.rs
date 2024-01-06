@@ -1,9 +1,7 @@
-use rayon::prelude::*;
-
 use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, RGB};
 use crate::surface::Surface;
 use crate::texture::Texture;
-use crate::util::Array2D;
+use crate::util::{run_parallel_jobs, Array2D};
 
 // If we try to trace from the exact position on a surface, sometimes we will
 // detect the object that we are on due to floating point rounding issues.
@@ -79,20 +77,27 @@ impl Scene {
         let y_offset = (height as f32) / 2.0;
         let camera_scale = 2.0 / largest_dimension;
 
-        // Can't figure out how to get Rayon to use my iterator directly, so I
-        // convert to a vec of references first.
-        let mut tmp: Vec<&mut [RGB]> = image.iter_rows_mut().collect();
-        tmp.par_iter_mut().zip(0..height).for_each(|(row, y)| {
-            row.iter_mut().zip(0..width).for_each(|(pixel, x)| {
-                let camera_x = ((x as f32) - x_offset) * camera_scale;
-                let camera_y = ((y as f32) - y_offset) * camera_scale;
-                *pixel = self.cast(
-                    &camera.ray_origin(),
-                    &camera.ray_direction(camera_x, camera_y),
-                    10,
-                );
+        // Create jobs vector, one job per row in the output image
+        let jobs: Vec<_> = image
+            .iter_rows_mut()
+            .zip(0..height)
+            .map(|(row, y)| {
+                move || {
+                    for (pixel, x) in row.iter_mut().zip(0..width) {
+                        let camera_x = ((x as f32) - x_offset) * camera_scale;
+                        let camera_y = ((y as f32) - y_offset) * camera_scale;
+                        *pixel = self.cast(
+                            &camera.ray_origin(),
+                            &camera.ray_direction(camera_x, camera_y),
+                            10,
+                        );
+                    }
+                }
             })
-        });
+            .collect();
+
+        // Actually run the jobs
+        run_parallel_jobs(jobs);
 
         image
     }
