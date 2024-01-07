@@ -43,7 +43,7 @@ impl CommandLineArguments {
         }
 
         eprintln!("Usage: raymond [options]");
-        eprintln!("");
+        eprintln!();
         flag_usage(
             Self::FLAG_OUTPUT,
             "Output file in PPM format (overwritten if already exists)",
@@ -100,7 +100,7 @@ fn random_sphere() -> VisObj {
             },
             1.0,
         )),
-        texture: Box::new(RGB {
+        texture: Box::new(Rgb {
             red: util::rand_f32(),
             green: util::rand_f32(),
             blue: util::rand_f32(),
@@ -111,7 +111,7 @@ fn random_sphere() -> VisObj {
 
 fn build_scene(camera: &Camera) -> Scene {
     let mut scene = Scene {
-        background: RGB {
+        background: Rgb {
             red: 0.3,
             green: 0.5,
             blue: 0.9,
@@ -150,12 +150,12 @@ fn build_scene(camera: &Camera) -> Scene {
             },
         )),
         texture: Box::new(Checkerboard::new(
-            Box::new(RGB {
+            Box::new(Rgb {
                 red: 2.5 / 3.0,
                 green: 2.5 / 3.0,
                 blue: 2.5 / 3.0,
             }),
-            Box::new(RGB {
+            Box::new(Rgb {
                 red: 2.5,
                 green: 0.0,
                 blue: 0.0,
@@ -164,37 +164,38 @@ fn build_scene(camera: &Camera) -> Scene {
         reflectivity: 0.0,
     });
 
-    let mut colormap = Vec::new();
-    colormap.push(RGB {
-        red: 0.0,
-        green: 0.0,
-        blue: 0.5,
-    });
-    colormap.push(RGB {
-        red: 0.0,
-        green: 0.0,
-        blue: 1.0,
-    });
-    colormap.push(RGB {
-        red: 0.0,
-        green: 1.0,
-        blue: 1.0,
-    });
-    colormap.push(RGB {
-        red: 1.0,
-        green: 1.0,
-        blue: 0.0,
-    });
-    colormap.push(RGB {
-        red: 1.0,
-        green: 0.0,
-        blue: 0.0,
-    });
-    colormap.push(RGB {
-        red: 0.5,
-        green: 0.0,
-        blue: 0.0,
-    });
+    let colormap = vec![
+        Rgb {
+            red: 0.0,
+            green: 0.0,
+            blue: 0.5,
+        },
+        Rgb {
+            red: 0.0,
+            green: 0.0,
+            blue: 1.0,
+        },
+        Rgb {
+            red: 0.0,
+            green: 1.0,
+            blue: 1.0,
+        },
+        Rgb {
+            red: 1.0,
+            green: 1.0,
+            blue: 0.0,
+        },
+        Rgb {
+            red: 1.0,
+            green: 0.0,
+            blue: 0.0,
+        },
+        Rgb {
+            red: 0.5,
+            green: 0.0,
+            blue: 0.0,
+        },
+    ];
 
     // Rectangle showing the Mandelbrot set
     scene.objects.push(VisObj {
@@ -276,7 +277,7 @@ fn build_scene(camera: &Camera) -> Scene {
             },
             1.5,
         )),
-        texture: Box::new(RGB::BLACK),
+        texture: Box::new(Rgb::BLACK),
         reflectivity: 0.9,
     });
 
@@ -288,7 +289,7 @@ fn main() -> ExitCode {
         Ok(args) => args,
         Err(msg) => {
             eprintln!("Error processing command line arguments: {}", msg);
-            eprintln!("");
+            eprintln!();
             CommandLineArguments::show_usage();
             return ExitCode::FAILURE;
         }
@@ -320,7 +321,7 @@ fn main() -> ExitCode {
 
     for scanline in image.iter_rows() {
         for pixel in scanline {
-            let (red, green, blue) = pixel.linear_to_srgb().to_rgb24();
+            let (red, green, blue) = pixel.linear_to_srgb().rgb24();
             ppm_out.write(red, green, blue).unwrap();
         }
     }

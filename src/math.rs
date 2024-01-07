@@ -10,10 +10,10 @@ pub struct Vec3f {
     pub z: f32,
 }
 
-/// "Linear" RGB value. (ie, SRGB without gamma correction)
+/// "Linear" Rgb value. (ie, SRGB without gamma correction)
 /// Component values fall in [0.0, 1.0]
 #[derive(Debug, Copy, Clone)]
-pub struct RGB {
+pub struct Rgb {
     pub red: f32,
     pub green: f32,
     pub blue: f32,
@@ -67,16 +67,16 @@ impl Vec3f {
     }
 }
 
-impl RGB {
-    pub const BLACK: RGB = RGB {
+impl Rgb {
+    pub const BLACK: Rgb = Rgb {
         red: 0.0,
         green: 0.0,
         blue: 0.0,
     };
 
-    /// Produce a 24-bit RGB value (It is assumed that the caller has already converted
+    /// Produce a 24-bit Rgb value (It is assumed that the caller has already converted
     /// to SRGB with linear_to_srgb())
-    pub fn to_rgb24(&self) -> (u8, u8, u8) {
+    pub fn rgb24(&self) -> (u8, u8, u8) {
         (
             (self.red * 255.0) as u8,
             (self.green * 255.0) as u8,
@@ -84,33 +84,33 @@ impl RGB {
         )
     }
 
-    fn map(&self, f: impl Fn(f32) -> f32) -> RGB {
-        RGB {
+    fn map(&self, f: impl Fn(f32) -> f32) -> Rgb {
+        Rgb {
             red: f(self.red),
             green: f(self.green),
             blue: f(self.blue),
         }
     }
 
-    pub fn linear_to_srgb(&self) -> RGB {
+    pub fn linear_to_srgb(&self) -> Rgb {
         self.map(|x| x.max(0.0).min(1.0).powf(1.0 / 2.2))
     }
 
-    pub fn srgb_to_linear(&self) -> RGB {
+    pub fn srgb_to_linear(&self) -> Rgb {
         self.map(|x| x.max(0.0).min(1.0).powf(2.2))
     }
 
     // TODO: Very similar to Vec3f functionality, and one could imagine use for other
     // methods from Vec3f as well, maybe there is a way to factor out the common methods.
-    pub fn scale(&self, factor: f32) -> RGB {
-        RGB {
+    pub fn scale(&self, factor: f32) -> Rgb {
+        Rgb {
             red: self.red * factor,
             green: self.green * factor,
             blue: self.blue * factor,
         }
     }
-    pub fn add(&self, other: &RGB) -> RGB {
-        RGB {
+    pub fn add(&self, other: &Rgb) -> Rgb {
+        Rgb {
             red: self.red + other.red,
             green: self.green + other.green,
             blue: self.blue + other.blue,
@@ -157,10 +157,10 @@ pub fn gaussian_kernel(sigma: f32) -> Vec<f32> {
 /// Performs a two dimensional convolution against the provided image and returns
 /// a new image. For a W by H image with kernel length K and decimation factor D, the
 /// output dimensions will be (W - (K - 1))/D by (H - (K - 1))/D
-pub fn convolve_2d(image: &Array2D<RGB>, kernel: &[f32], decimation_factor: usize) -> Array2D<RGB> {
+pub fn convolve_2d(image: &Array2D<Rgb>, kernel: &[f32], decimation_factor: usize) -> Array2D<Rgb> {
     // We convolve & transpose twice, which results in an untransposed image
-    let flipped = convolve_and_transpose(image, &kernel, decimation_factor);
-    convolve_and_transpose(&flipped, &kernel, decimation_factor)
+    let flipped = convolve_and_transpose(image, kernel, decimation_factor);
+    convolve_and_transpose(&flipped, kernel, decimation_factor)
 }
 
 /// Convolves the given kernel across the image horizontally, and returns a
@@ -169,16 +169,16 @@ pub fn convolve_2d(image: &Array2D<RGB>, kernel: &[f32], decimation_factor: usiz
 /// The transposition is intended to allow for the function to easily be
 /// applied twice to an image to result in a 2D convolution, see convolve_2d.
 fn convolve_and_transpose(
-    image: &Array2D<RGB>,
+    image: &Array2D<Rgb>,
     kernel: &[f32],
     decimation_factor: usize,
-) -> Array2D<RGB> {
+) -> Array2D<Rgb> {
     let input_width = image.columns;
     let input_height = image.rows;
     let kernel_length = kernel.len();
     let output_width = input_height;
     let output_height = (input_width - (kernel_length - 1)) / decimation_factor;
-    let mut output_image = Array2D::new(output_height, output_width, &RGB::BLACK);
+    let mut output_image = Array2D::new(output_height, output_width, &Rgb::BLACK);
 
     // Create jobs that blur the rows of the input image into the columns of
     // the output image.
@@ -188,12 +188,12 @@ fn convolve_and_transpose(
         .map(|(mut out_column, in_row)| {
             move || {
                 for (out_pixel, out_y) in out_column.iter_mut().zip(0..output_height) {
-                    let in_x = out_y * (decimation_factor as usize);
+                    let in_x = out_y * decimation_factor;
                     *out_pixel = in_row[in_x..(in_x + kernel_length)]
                         .iter()
                         .zip(kernel)
                         .map(|(color, coef)| color.scale(*coef))
-                        .fold(RGB::BLACK, |acc, color| acc.add(&color));
+                        .fold(Rgb::BLACK, |acc, color| acc.add(&color));
                 }
             }
         })
@@ -240,7 +240,7 @@ pub fn mandelbrot_escape_time(c: Complex<f32>) -> Option<f32> {
 
 /// Linearlly interpolates into a grid of colors, wrapping a circular manner if index
 /// exceeds the length of the grid.
-pub fn linear_interpolation(grid: &[RGB], index: f32) -> RGB {
+pub fn linear_interpolation(grid: &[Rgb], index: f32) -> Rgb {
     let base_index = index as usize;
     let fractional_index = index - (base_index as f32);
     let a = grid[base_index % grid.len()];

@@ -58,7 +58,7 @@ impl Sphere {
 impl Surface for Sphere {
     fn intersection_with_ray(&self, ray_origin: &Vec3f, ray_direction: &Vec3f) -> Option<f32> {
         let origin_minus_center = ray_origin.sub(&self.center);
-        let a = ray_direction.dot(&ray_direction); // Shouldn't this always be 1.0???
+        let a = ray_direction.dot(ray_direction); // Shouldn't this always be 1.0???
         let b = 2.0 * ray_direction.dot(&origin_minus_center);
         let c = origin_minus_center.dot(&origin_minus_center) - (self.radius * self.radius);
 
@@ -107,7 +107,7 @@ impl Surface for Plane {
             // Basically zero, no intersection
             None
         } else {
-            let numer = (self.position.sub(&ray_origin)).dot(&self.normal);
+            let numer = (self.position.sub(ray_origin)).dot(&self.normal);
             let d = numer / denom;
 
             if d > 0.0 {

@@ -1,7 +1,6 @@
 use std::cell::Cell;
 use std::sync::Mutex;
 use std::thread;
-use strided;
 use strided::{MutStride, Stride};
 
 /// Fixed size two dimensional array
@@ -62,7 +61,7 @@ impl<T: Clone> Array2D<T> {
 /// closures in parallel.
 pub fn run_parallel_jobs<J>(jobs: Vec<J>)
 where
-    J: FnOnce() -> () + Send,
+    J: FnOnce() + Send,
 {
     let job_queue: Mutex<Vec<J>> = Mutex::new(jobs);
     let num_cpus: usize = std::thread::available_parallelism().unwrap().into();

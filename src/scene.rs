@@ -1,4 +1,4 @@
-use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, RGB};
+use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, Rgb};
 use crate::surface::Surface;
 use crate::texture::Texture;
 use crate::util::{run_parallel_jobs, Array2D};
@@ -22,7 +22,7 @@ pub struct VisObj {
 }
 
 pub struct Scene {
-    pub background: RGB,
+    pub background: Rgb,
     pub ambient_light_intensity: f32,
     pub light_sources: Vec<LightSource>,
     pub objects: Vec<VisObj>,
@@ -69,8 +69,8 @@ impl Camera {
 }
 
 impl Scene {
-    pub fn trace_image(&self, camera: &Camera, width: usize, height: usize) -> Array2D<RGB> {
-        let mut image = Array2D::new(height, width, &RGB::BLACK);
+    pub fn trace_image(&self, camera: &Camera, width: usize, height: usize) -> Array2D<Rgb> {
+        let mut image = Array2D::new(height, width, &Rgb::BLACK);
 
         let largest_dimension = width.max(height) as f32;
         let x_offset = (width as f32) / 2.0;
@@ -87,7 +87,7 @@ impl Scene {
                         let camera_x = ((x as f32) - x_offset) * camera_scale;
                         let camera_y = ((y as f32) - y_offset) * camera_scale;
                         *pixel = self.cast(
-                            &camera.ray_origin(),
+                            camera.ray_origin(),
                             &camera.ray_direction(camera_x, camera_y),
                             10,
                         );
@@ -108,7 +108,7 @@ impl Scene {
         width: usize,
         height: usize,
         oversampling_factor: usize,
-    ) -> Array2D<RGB> {
+    ) -> Array2D<Rgb> {
         if oversampling_factor > 1 {
             let sigma = (oversampling_factor as f32) * 0.4;
             let resampling_kernel = gaussian_kernel(sigma);
@@ -134,7 +134,7 @@ impl Scene {
             // Get a list of intersecting spheres with their distances as a 2-tuple
             .filter_map(|vobj| {
                 vobj.surface
-                    .intersection_with_ray(&ray_origin, &ray_direction)
+                    .intersection_with_ray(ray_origin, ray_direction)
                     .map(|dist| (vobj, dist))
             })
             // Select (vobj, distance) 2-tuple with the minimum distance
@@ -155,7 +155,7 @@ impl Scene {
                         light_source
                             .dir_to_light
                             .normalize()
-                            .dot(&surface_normal)
+                            .dot(surface_normal)
                             .max(0.0)
                             * light_source.intensity
                     }
@@ -166,28 +166,28 @@ impl Scene {
         self.ambient_light_intensity + lambert_light_intensity
     }
 
-    pub fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> RGB {
+    pub fn cast(&self, ray_origin: &Vec3f, ray_direction: &Vec3f, max_depth: i32) -> Rgb {
         if max_depth == 0 {
             return self.background;
         }
 
-        match self.trace_to_nearest_object(&ray_origin, &ray_direction) {
+        match self.trace_to_nearest_object(ray_origin, ray_direction) {
             Some((vobj, dist)) => {
                 let intersection_pos = ray_origin.add(&ray_direction.scale(dist));
                 let surf_prop = vobj.surface.at_point(&intersection_pos);
                 let light_intensity = self.light_on_surface(&intersection_pos, &surf_prop.normal);
                 let vobj_color = vobj
                     .texture
-                    .color(&self, max_depth, surf_prop.u, surf_prop.v);
+                    .color(self, max_depth, surf_prop.u, surf_prop.v);
 
                 let reflected_color = if vobj.reflectivity != 0.0 {
-                    let reflect_ray = angle_of_reflection(&ray_direction, &surf_prop.normal);
+                    let reflect_ray = angle_of_reflection(ray_direction, &surf_prop.normal);
                     let reflect_origin = intersection_pos.add(&surf_prop.normal.scale(FLOAT_BIAS));
 
                     self.cast(&reflect_origin, &reflect_ray, max_depth - 1)
                         .scale(vobj.reflectivity)
                 } else {
-                    RGB::BLACK
+                    Rgb::BLACK
                 };
 
                 vobj_color.scale(light_intensity).add(&reflected_color)
