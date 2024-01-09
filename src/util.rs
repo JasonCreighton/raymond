@@ -64,26 +64,34 @@ where
     J: FnOnce() + Send,
 {
     let job_queue: Mutex<Vec<J>> = Mutex::new(jobs);
-    let num_cpus: usize = std::thread::available_parallelism().unwrap().into();
 
-    thread::scope(|s| {
-        // Spawn num_cpus worker threads
-        for _ in 0..num_cpus {
-            s.spawn(|| {
-                loop {
-                    // Pull a job from the queue
-                    let mut vec_guard = job_queue.lock().unwrap();
-                    let option_job = vec_guard.pop();
-                    drop(vec_guard); // release mutex
+    // Create a common worker closure we can use across all threads.
+    let worker: &(dyn Fn() + Sync) = &|| {
+        loop {
+            // Pull a job from the queue
+            let mut vec_guard = job_queue.lock().unwrap();
+            let option_job = vec_guard.pop();
+            drop(vec_guard); // release mutex
 
-                    // Execute it, or if the queue was empty, exit the thread
-                    match option_job {
-                        Some(job) => job(),
-                        None => break,
-                    }
-                }
-            });
+            // Execute it, or if the queue was empty, quit the worker
+            match option_job {
+                Some(job) => job(),
+                None => break,
+            }
         }
+    };
+
+    // Run workers
+    thread::scope(|s| {
+        let num_cpus: usize = std::thread::available_parallelism().unwrap().into();
+
+        // Spawn (num_cpus - 1) worker threads
+        for _ in 0..(num_cpus - 1) {
+            s.spawn(worker);
+        }
+
+        // Do work on the calling thread too
+        worker();
     });
 }
 
