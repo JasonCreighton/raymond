@@ -1,4 +1,4 @@
-use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Vec3f, Rgb};
+use crate::math::{angle_of_reflection, convolve_2d, gaussian_kernel, Rgb, Vec3f};
 use crate::surface::Surface;
 use crate::texture::Texture;
 use crate::util::{run_parallel_jobs, Array2D};
